@@ -16,10 +16,12 @@ export default function Home() {
         </p>
       </div>
 
-      <p className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
-        M0 scaffold is live. Owner login and the job board arrive in the next
-        milestones.
-      </p>
+      <Link
+        href="/login"
+        className="rounded-md bg-gray-900 px-4 py-3 text-center text-base font-semibold text-white active:bg-gray-700"
+      >
+        Owner sign in
+      </Link>
 
       <Link
         href="/health"
