@@ -27,8 +27,12 @@ In the project: **Settings (gear) → API**. You need three values:
 | Dashboard label | Goes into `.env.local` as | Secret? |
 | --- | --- | --- |
 | Project URL | `NEXT_PUBLIC_SUPABASE_URL` | no (public) |
-| Project API keys → **anon / public** | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | no (public) |
-| Project API keys → **service_role** | `SUPABASE_SERVICE_ROLE_KEY` | **YES — server only, never share** |
+| **Publishable** key (`sb_publishable_…`) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | no (public) |
+| **Secret** key (`sb_secret_…`) | `SUPABASE_SERVICE_ROLE_KEY` | **YES — server only, never share** |
+
+> **Two easy mistakes to avoid:**
+> 1. For the URL, copy the **base Project URL** — `https://YOUR_REF.supabase.co` — **not** the REST endpoint that ends in `/rest/v1/`. The client appends `/rest/v1/` itself; a trailing path breaks every call.
+> 2. Supabase's current key names are **Publishable** (browser-safe, = the `anon` role) and **Secret** (server-only, = `service_role`). Those are the right ones. The older `eyJ…` "anon/service_role (legacy)" JWT keys also work but aren't needed.
 
 > The `service_role` key bypasses all security rules. It only ever lives in `.env.local` (gitignored) and in Vercel's encrypted env settings — never in the browser, never committed, never in a screenshot.
 
