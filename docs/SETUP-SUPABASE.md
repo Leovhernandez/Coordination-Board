@@ -12,7 +12,13 @@ This is the canonical, do-not-skip checklist for provisioning the Coordination B
 4. **Database password:** click *Generate*, then **save it in your password manager**. You won't need it for the app (the app uses API keys), but you'll want it for direct DB access later.
 5. **Region:** choose the one closest to Four L's crews (e.g. **East US (North Virginia)** or **Central US**). Lower latency = snappier live board.
 6. **Plan:** Free is fine for the pilot.
-7. Click **Create new project** and wait ~2 minutes for it to finish provisioning.
+7. **Security section** (on the create screen):
+   - **Enable Data API** — leave **checked** (the JS client needs it).
+   - **Automatically expose new tables** — **uncheck** (least privilege; our migration grants table access explicitly to `authenticated` + `service_role`, never to `anon`).
+   - **Enable automatic RLS** — leave **unchecked** (our migration enables RLS per-table itself).
+   - **Postgres Type** — keep **Postgres (Default)**, not OrioleDB (alpha).
+   > The migration includes the explicit grants, so it applies cleanly whether or not that middle box ends up checked. Unchecked is just the cleaner, recommended state.
+8. Click **Create new project** and wait ~2 minutes for it to finish provisioning.
 
 ## 2. Copy the API keys
 

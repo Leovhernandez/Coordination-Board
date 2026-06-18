@@ -70,6 +70,29 @@ alter table phases
   );
 
 -- ============================================================================
+-- Data API grants
+--
+-- A query needs BOTH a table GRANT and a passing RLS policy. Supabase's
+-- "automatically expose new tables" toggle is the thing that auto-grants new
+-- tables to the API roles; we keep it DISABLED (least privilege) and grant
+-- explicitly here. These statements are idempotent, so the migration also works
+-- if that toggle was left enabled.
+--
+-- `authenticated` = the signed-in owner (still constrained by the RLS policies
+-- below). `service_role` = the server-side client used by participant server
+-- actions; it bypasses RLS, with token->job scoping enforced in app code.
+-- `anon` is intentionally granted nothing.
+-- ============================================================================
+
+grant select, insert, update, delete
+  on organizations, jobs, participants, phases
+  to authenticated;
+
+grant all
+  on organizations, jobs, participants, phases
+  to service_role;
+
+-- ============================================================================
 -- Row Level Security
 --
 -- Owner model only: the Supabase-authed contractor can do everything within
