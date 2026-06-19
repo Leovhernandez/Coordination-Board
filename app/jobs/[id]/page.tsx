@@ -36,13 +36,15 @@ export default async function JobBoardPage({
       <header>
         <Link
           href="/dashboard"
-          className="text-sm text-gray-500 underline underline-offset-4"
+          className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-700"
         >
           ← Jobs
         </Link>
-        <h1 className="mt-1 text-xl font-semibold">{job.name}</h1>
+        <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900">
+          {job.name}
+        </h1>
         {(job.customer_name || job.address) && (
-          <p className="text-xs text-gray-500">
+          <p className="text-sm text-slate-500">
             {[job.customer_name, job.address].filter(Boolean).join(" · ")}
           </p>
         )}

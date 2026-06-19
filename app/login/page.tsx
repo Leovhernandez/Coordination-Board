@@ -9,21 +9,23 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-sm flex-col justify-center gap-6 p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Owner sign in</h1>
-        <p className="text-sm text-gray-600">
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          Owner sign in
+        </h1>
+        <p className="text-sm text-slate-500">
           Enter your email and we&apos;ll send you a one-tap sign-in link. No
           password.
         </p>
       </div>
 
       {sp.sent ? (
-        <div className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
           Check your email for the sign-in link. You can close this tab.
         </div>
       ) : (
         <form action={sendMagicLink} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm font-medium">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
             Email
             <input
               name="email"
@@ -32,12 +34,12 @@ export default async function LoginPage({
               autoComplete="email"
               inputMode="email"
               placeholder="you@company.com"
-              className="rounded-md border border-gray-300 px-3 py-3 text-base outline-none focus:border-gray-900"
+              className="rounded-lg border border-slate-300 px-3 py-3 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />
           </label>
           <button
             type="submit"
-            className="rounded-md bg-gray-900 px-4 py-3 text-base font-semibold text-white active:bg-gray-700"
+            className="rounded-lg bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-700"
           >
             Send sign-in link
           </button>

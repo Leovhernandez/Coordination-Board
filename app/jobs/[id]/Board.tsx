@@ -2,6 +2,7 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import type { Phase, PhaseStatus } from "@/lib/types";
+import { STATUS_ACCENT, STATUS_ACTIVE, STATUS_LABEL, STATUS_PILL } from "@/lib/status";
 import { setPhaseStatus } from "./actions";
 
 type OptimisticUpdate = {
@@ -10,22 +11,10 @@ type OptimisticUpdate = {
   blocked_reason: string | null;
 };
 
-const CONTROLS: { status: PhaseStatus; label: string; active: string }[] = [
-  {
-    status: "in_progress",
-    label: "In progress",
-    active: "bg-amber-500 text-white border-amber-500",
-  },
-  {
-    status: "blocked",
-    label: "Blocked",
-    active: "bg-red-600 text-white border-red-600",
-  },
-  {
-    status: "done",
-    label: "Done",
-    active: "bg-green-600 text-white border-green-600",
-  },
+const CONTROLS: { status: PhaseStatus; label: string }[] = [
+  { status: "in_progress", label: "In progress" },
+  { status: "blocked", label: "Blocked" },
+  { status: "done", label: "Done" },
 ];
 
 export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
@@ -51,7 +40,6 @@ export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
 
   function onTapStatus(p: Phase, status: PhaseStatus) {
     if (status === "blocked") {
-      // Open the inline "waiting on ___" field instead of committing blindly.
       setBlockingId(p.id);
       setReasonDraft(p.blocked_reason ?? "");
       return;
@@ -70,62 +58,76 @@ export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
   return (
     <div className="flex flex-col gap-3">
       {optimisticPhases.map((p) => (
-        <div key={p.id} className="rounded-lg border border-gray-200 p-3">
-          <div className="mb-2 font-medium">
-            {p.sequence_index + 1}. {p.label}
-          </div>
-
-          <div className="flex gap-2">
-            {CONTROLS.map((c) => {
-              const isActive = p.status === c.status;
-              return (
-                <button
-                  key={c.status}
-                  type="button"
-                  onClick={() => onTapStatus(p, c.status)}
-                  aria-pressed={isActive}
-                  className={`flex-1 rounded-md border py-3 text-sm font-semibold transition-colors ${
-                    isActive
-                      ? c.active
-                      : "border-gray-300 bg-white text-gray-700 active:bg-gray-100"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {blockingId === p.id ? (
-            <div className="mt-2 flex gap-2">
-              <input
-                value={reasonDraft}
-                onChange={(e) => setReasonDraft(e.target.value)}
-                placeholder="Waiting on…"
-                autoFocus
-                enterKeyHint="done"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveBlocked(p);
-                }}
-                className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-3 text-base outline-none focus:border-gray-900"
-              />
-              <button
-                type="button"
-                onClick={() => saveBlocked(p)}
-                disabled={!reasonDraft.trim()}
-                className="rounded-md bg-red-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+        <div
+          key={p.id}
+          className="flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+        >
+          <div className={`w-1.5 shrink-0 ${STATUS_ACCENT[p.status]}`} />
+          <div className="flex-1 p-3.5">
+            <div className="mb-2.5 flex items-center justify-between gap-2">
+              <span className="font-semibold text-slate-900">
+                <span className="text-slate-400">{p.sequence_index + 1}.</span>{" "}
+                {p.label}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
               >
-                Save
-              </button>
+                {STATUS_LABEL[p.status]}
+              </span>
             </div>
-          ) : (
-            p.status === "blocked" &&
-            p.blocked_reason && (
-              <p className="mt-2 text-sm font-medium text-red-700">
-                ⛔ Waiting on {p.blocked_reason}
-              </p>
-            )
-          )}
+
+            <div className="flex gap-2">
+              {CONTROLS.map((c) => {
+                const isActive = p.status === c.status;
+                return (
+                  <button
+                    key={c.status}
+                    type="button"
+                    onClick={() => onTapStatus(p, c.status)}
+                    aria-pressed={isActive}
+                    className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold transition-colors ${
+                      isActive
+                        ? STATUS_ACTIVE[c.status]
+                        : "border-slate-200 bg-white text-slate-600 active:bg-slate-100"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {blockingId === p.id ? (
+              <div className="mt-2.5 flex gap-2">
+                <input
+                  value={reasonDraft}
+                  onChange={(e) => setReasonDraft(e.target.value)}
+                  placeholder="Waiting on…"
+                  autoFocus
+                  enterKeyHint="done"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveBlocked(p);
+                  }}
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => saveBlocked(p)}
+                  disabled={!reasonDraft.trim()}
+                  className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              p.status === "blocked" &&
+              p.blocked_reason && (
+                <p className="mt-2.5 text-sm font-medium text-red-700">
+                  ⛔ Waiting on {p.blocked_reason}
+                </p>
+              )
+            )}
+          </div>
         </div>
       ))}
     </div>
