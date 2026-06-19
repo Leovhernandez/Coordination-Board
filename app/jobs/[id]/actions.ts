@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { PhaseStatus } from "@/lib/types";
@@ -127,5 +128,51 @@ export async function movePhase(
     .update({ sequence_index: neighbor.sequence_index })
     .eq("id", phaseId);
 
+  revalidateJob(jobId);
+}
+
+// --- Crew (link-token participants) ---
+
+/** Adds a participant and mints a 32-byte base64url invite token. */
+export async function addParticipant(
+  jobId: string,
+  name: string,
+  phone: string | null,
+) {
+  const n = name.trim();
+  if (!n) return;
+
+  const supabase = await createClient();
+  const token = randomBytes(32).toString("base64url");
+  await supabase.from("participants").insert({
+    job_id: jobId,
+    name: n,
+    phone: phone?.trim() || null,
+    invite_token: token,
+  });
+  revalidateJob(jobId);
+}
+
+/** Revokes a participant's link (their token stops working immediately). */
+export async function revokeParticipant(participantId: string, jobId: string) {
+  const supabase = await createClient();
+  await supabase
+    .from("participants")
+    .update({ revoked: true })
+    .eq("id", participantId);
+  revalidateJob(jobId);
+}
+
+/** Assigns (or clears) the participant who may update a phase. */
+export async function assignPhase(
+  phaseId: string,
+  jobId: string,
+  participantId: string | null,
+) {
+  const supabase = await createClient();
+  await supabase
+    .from("phases")
+    .update({ assignee_participant_id: participantId })
+    .eq("id", phaseId);
   revalidateJob(jobId);
 }

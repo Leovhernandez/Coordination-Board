@@ -12,11 +12,14 @@ import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
 import {
   addPhase,
+  assignPhase,
   deletePhase,
   movePhase,
   renamePhase,
   setPhaseStatus,
 } from "./actions";
+
+type CrewOption = { id: string; name: string };
 
 type OptimisticUpdate = {
   id: string;
@@ -30,7 +33,16 @@ const CONTROLS: { status: PhaseStatus; label: string }[] = [
   { status: "done", label: "Done" },
 ];
 
-export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
+export function Board({
+  jobId,
+  phases,
+  participants,
+}: {
+  jobId: string;
+  phases: Phase[];
+  participants: CrewOption[];
+}) {
+  const nameOf = new Map(participants.map((p) => [p.id, p.name]));
   const [, startTransition] = useTransition();
   const [optimisticPhases, applyOptimistic] = useOptimistic(
     phases,
@@ -91,6 +103,10 @@ export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
     startTransition(() => addPhase(jobId, label));
   }
 
+  function onAssign(p: Phase, participantId: string | null) {
+    startTransition(() => assignPhase(p.id, jobId, participantId));
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {!editMode && <Headline data={computeHeadline(optimisticPhases)} />}
@@ -127,6 +143,25 @@ export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
                   aria-label="Phase name"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                 />
+                {participants.length > 0 ? (
+                  <select
+                    value={p.assignee_participant_id ?? ""}
+                    onChange={(e) => onAssign(p, e.target.value || null)}
+                    aria-label="Assign to"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base outline-none focus:border-slate-900"
+                  >
+                    <option value="">Unassigned</option>
+                    {participants.map((pt) => (
+                      <option key={pt.id} value={pt.id}>
+                        {pt.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-slate-400">
+                    Add crew below, then assign them here.
+                  </p>
+                )}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -158,11 +193,19 @@ export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
             ) : (
               <>
                 <div className="mb-2.5 flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-900">
-                    <span className="text-slate-400">{i + 1}.</span> {p.label}
-                  </span>
+                  <div className="min-w-0">
+                    <span className="font-semibold text-slate-900">
+                      <span className="text-slate-400">{i + 1}.</span> {p.label}
+                    </span>
+                    {p.assignee_participant_id &&
+                      nameOf.get(p.assignee_participant_id) && (
+                        <span className="block text-xs text-slate-400">
+                          {nameOf.get(p.assignee_participant_id)}
+                        </span>
+                      )}
+                  </div>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
                   >
                     {STATUS_LABEL[p.status]}
                   </span>

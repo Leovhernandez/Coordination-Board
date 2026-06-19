@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { participantLink } from "@/lib/participant";
 import { Board } from "./Board";
-import type { Job, Phase } from "@/lib/types";
+import { Crew } from "./Crew";
+import type { Job, Participant, Phase } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,20 @@ export default async function JobBoardPage({
     .order("sequence_index", { ascending: true });
   const phases = (phasesData ?? []) as Phase[];
 
+  const { data: participantsData } = await supabase
+    .from("participants")
+    .select("*")
+    .eq("job_id", id)
+    .eq("revoked", false)
+    .order("created_at", { ascending: true });
+  const participants = (participantsData ?? []) as Participant[];
+  const crew = participants.map((p) => ({
+    id: p.id,
+    name: p.name,
+    phone: p.phone,
+    link: participantLink(id, p.invite_token),
+  }));
+
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-4 p-4">
       <header>
@@ -50,7 +66,13 @@ export default async function JobBoardPage({
         )}
       </header>
 
-      <Board jobId={job.id} phases={phases} />
+      <Board
+        jobId={job.id}
+        phases={phases}
+        participants={participants.map((p) => ({ id: p.id, name: p.name }))}
+      />
+
+      <Crew jobId={job.id} crew={crew} />
     </main>
   );
 }
