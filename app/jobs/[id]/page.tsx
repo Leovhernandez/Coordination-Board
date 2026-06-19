@@ -36,7 +36,7 @@ export default async function JobBoardPage({
       <header>
         <Link
           href="/dashboard"
-          className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-700"
+          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600 shadow-sm active:bg-slate-100"
         >
           ← Jobs
         </Link>

@@ -74,7 +74,7 @@ export default async function DashboardPage() {
               <h2 className="text-base font-semibold text-slate-900">
                 {job.name}
               </h2>
-              <span className="shrink-0 text-sm font-medium text-slate-400">
+              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-500">
                 Open →
               </span>
             </div>
