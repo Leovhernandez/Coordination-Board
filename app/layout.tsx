@@ -19,8 +19,10 @@ export const metadata: Metadata = {
 };
 
 // Mobile-first PWA baseline (full PWA manifest + service worker arrives in M7).
+// Light-only theme for now (better outdoor/job-site readability); theme-color
+// matches the page background so the mobile browser chrome stays consistent.
 export const viewport: Viewport = {
-  themeColor: "#0f172a",
+  themeColor: "#f6f7f9",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
