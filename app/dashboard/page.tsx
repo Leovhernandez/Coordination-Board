@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOrCreateOrg } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -73,11 +74,15 @@ export default async function DashboardPage() {
         )}
 
         {jobs.map((job) => (
-          <article
+          <Link
             key={job.id}
-            className="rounded-lg border border-gray-200 p-4"
+            href={`/jobs/${job.id}`}
+            className="block rounded-lg border border-gray-200 p-4 active:bg-gray-50"
           >
-            <h2 className="text-base font-semibold">{job.name}</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">{job.name}</h2>
+              <span className="text-sm text-gray-400">Open board →</span>
+            </div>
             {(job.address || job.customer_name) && (
               <p className="text-xs text-gray-500">
                 {[job.customer_name, job.address].filter(Boolean).join(" · ")}
@@ -100,7 +105,7 @@ export default async function DashboardPage() {
                 </li>
               ))}
             </ul>
-          </article>
+          </Link>
         ))}
       </section>
 
