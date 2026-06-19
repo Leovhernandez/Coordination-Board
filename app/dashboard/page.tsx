@@ -84,16 +84,13 @@ export default async function DashboardPage() {
               </p>
             )}
             <ul className="mt-3 flex flex-col gap-1.5">
-              {(phasesByJob.get(job.id) ?? []).map((p) => (
+              {(phasesByJob.get(job.id) ?? []).map((p, i) => (
                 <li
                   key={p.id}
                   className="flex items-center justify-between text-sm"
                 >
                   <span className="text-slate-700">
-                    <span className="text-slate-400">
-                      {p.sequence_index + 1}.
-                    </span>{" "}
-                    {p.label}
+                    <span className="text-slate-400">{i + 1}.</span> {p.label}
                   </span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
