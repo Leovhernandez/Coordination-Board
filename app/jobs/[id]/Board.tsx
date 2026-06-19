@@ -8,6 +8,8 @@ import {
   STATUS_LABEL,
   STATUS_PILL,
 } from "@/lib/status";
+import { computeHeadline } from "@/lib/critical-path";
+import { Headline } from "@/components/Headline";
 import {
   addPhase,
   deletePhase,
@@ -91,6 +93,8 @@ export function Board({ jobId, phases }: { jobId: string; phases: Phase[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {!editMode && <Headline data={computeHeadline(optimisticPhases)} />}
+
       <div className="flex justify-end">
         <button
           type="button"

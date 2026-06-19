@@ -4,6 +4,8 @@ import { getOrCreateOrg } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
+import { computeHeadline } from "@/lib/critical-path";
+import { Headline } from "@/components/Headline";
 import { createJob } from "./actions";
 import type { Job, Phase } from "@/lib/types";
 
@@ -83,6 +85,14 @@ export default async function DashboardPage() {
                 {[job.customer_name, job.address].filter(Boolean).join(" · ")}
               </p>
             )}
+
+            <div className="mt-3">
+              <Headline
+                data={computeHeadline(phasesByJob.get(job.id) ?? [])}
+                compact
+              />
+            </div>
+
             <ul className="mt-3 flex flex-col gap-1.5">
               {(phasesByJob.get(job.id) ?? []).map((p, i) => (
                 <li
