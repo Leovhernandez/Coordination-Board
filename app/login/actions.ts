@@ -11,7 +11,9 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function sendMagicLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
-  if (!email) redirect("/login?error=1");
+  if (!email) {
+    redirect("/login?error=" + encodeURIComponent("Enter your email address."));
+  }
 
   const supabase = await createClient();
   const origin =
@@ -25,7 +27,9 @@ export async function sendMagicLink(formData: FormData) {
     },
   });
 
-  if (error) redirect("/login?error=1");
+  // Surface the real reason (e.g. redirect-URL not allowed, rate limit) so
+  // failures are diagnosable instead of a generic message.
+  if (error) redirect("/login?error=" + encodeURIComponent(error.message));
   redirect("/login?sent=1");
 }
 

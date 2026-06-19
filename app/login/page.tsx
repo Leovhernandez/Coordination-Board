@@ -45,7 +45,9 @@ export default async function LoginPage({
           </button>
           {sp.error && (
             <p className="text-sm text-red-600">
-              Something went wrong sending the link. Try again.
+              {sp.error === "1"
+                ? "Something went wrong sending the link. Try again."
+                : sp.error}
             </p>
           )}
         </form>
