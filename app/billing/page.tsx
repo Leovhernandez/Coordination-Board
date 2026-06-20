@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOrCreateOrg } from "@/lib/auth";
-import { isStripeConfigured, isSubscriptionActive } from "@/lib/stripe";
+import { isStripeConfigured, isAccessAllowed } from "@/lib/stripe";
 import { startCheckout, openBillingPortal } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export default async function BillingPage() {
   const org = await getOrCreateOrg();
   if (!org) redirect("/login");
 
-  const active = isSubscriptionActive(org.subscription_status);
+  const active = isAccessAllowed(org.subscription_status, org.trial_ends_at);
   const planLabel = process.env.NEXT_PUBLIC_PLAN_LABEL ?? "Monthly plan";
 
   return (

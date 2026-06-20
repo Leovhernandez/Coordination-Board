@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateOrg } from "@/lib/auth";
-import { isSubscriptionActive } from "@/lib/stripe";
+import { isAccessAllowed } from "@/lib/stripe";
 import { DEFAULT_PHASES } from "@/lib/phases";
 
 /**
@@ -22,8 +22,10 @@ export async function createJob(formData: FormData) {
   const org = await getOrCreateOrg();
   if (!org) return;
 
-  // Billing gate: only trialing/active orgs can create jobs (M8).
-  if (!isSubscriptionActive(org.subscription_status)) redirect("/billing");
+  // Billing gate: active, or trialing within the trial window (M8/M8.5).
+  if (!isAccessAllowed(org.subscription_status, org.trial_ends_at)) {
+    redirect("/billing");
+  }
 
   const supabase = await createClient();
   const { data: job, error } = await supabase

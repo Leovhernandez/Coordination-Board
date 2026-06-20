@@ -9,8 +9,10 @@ export type Organization = {
   id: string;
   name: string;
   owner_user_id: string;
+  owner_email: string | null;
   subscription_status: string;
   stripe_customer_id: string | null;
+  trial_ends_at: string | null;
 };
 
 export type Job = {

@@ -27,6 +27,22 @@ export function isSubscriptionActive(status: string): boolean {
   return (ACTIVE_STATUSES as readonly string[]).includes(status);
 }
 
+/**
+ * Whether an org may use the app (create jobs). Active = always; trialing is
+ * allowed only until trial_ends_at (null = unlimited, e.g. comped/admin).
+ * Hard enforcement: an expired trial is blocked without manual follow-up.
+ */
+export function isAccessAllowed(
+  status: string,
+  trialEndsAt: string | null,
+): boolean {
+  if (status === "active") return true;
+  if (status === "trialing") {
+    return !trialEndsAt || new Date(trialEndsAt).getTime() > Date.now();
+  }
+  return false;
+}
+
 /** Maps a Stripe subscription status to our stored subscription_status. */
 export function mapStripeStatus(status: Stripe.Subscription.Status): string {
   switch (status) {

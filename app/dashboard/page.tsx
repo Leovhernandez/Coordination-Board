@@ -7,7 +7,9 @@ import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
-import { isSubscriptionActive } from "@/lib/stripe";
+import { isAccessAllowed } from "@/lib/stripe";
+import { isAdminEmail } from "@/lib/admin";
+import { getOverseenCompany } from "@/lib/oversight";
 import { OrgName } from "./OrgName";
 import { createJob } from "./actions";
 import type { Job, Phase } from "@/lib/types";
@@ -50,6 +52,10 @@ export default async function DashboardPage({
     phasesByJob.set(p.job_id, list);
   }
 
+  // Company owner read-only roll-up (M8.5) — empty for normal GCs.
+  const company = showArchived ? [] : await getOverseenCompany(org.owner_email);
+  const admin = isAdminEmail(org.owner_email);
+
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 p-4">
       <RealtimeRefresh channelName="phases-dashboard" />
@@ -91,15 +97,23 @@ export default async function DashboardPage({
         >
           Billing
         </Link>
+        {admin && (
+          <Link
+            href="/admin"
+            className="rounded-full px-3 py-1 text-sm font-medium text-slate-500"
+          >
+            Admin
+          </Link>
+        )}
       </div>
 
-      {!isSubscriptionActive(org.subscription_status) && (
+      {!isAccessAllowed(org.subscription_status, org.trial_ends_at) && (
         <Link
           href="/billing"
           className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900"
         >
-          Your subscription is {org.subscription_status} — subscribe to create
-          jobs →
+          Your {org.subscription_status === "trialing" ? "trial has ended" : `subscription is ${org.subscription_status}`}{" "}
+          — subscribe to create jobs →
         </Link>
       )}
 
@@ -159,6 +173,46 @@ export default async function DashboardPage({
           </Link>
         ))}
       </section>
+
+      {company.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Company (read-only)
+          </h2>
+          {company.map((c) => (
+            <div key={c.orgId} className="flex flex-col gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                {c.orgName}
+              </p>
+              {c.jobs.length === 0 && (
+                <p className="text-xs text-slate-400">No active jobs.</p>
+              )}
+              {c.jobs.map((job) => (
+                <Link
+                  key={job.id}
+                  href={`/company/${job.id}`}
+                  className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition active:scale-[0.99] active:bg-slate-50"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold text-slate-900">
+                      {job.name}
+                    </h3>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-500">
+                      View →
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <Headline
+                      data={computeHeadline(c.phasesByJob.get(job.id) ?? [])}
+                      compact
+                    />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
 
       {!showArchived && (
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
