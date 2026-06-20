@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Organization } from "@/lib/types";
 
-const ORG_COLUMNS = "id, name, owner_user_id, subscription_status";
+const ORG_COLUMNS =
+  "id, name, owner_user_id, subscription_status, stripe_customer_id";
 
 /**
  * Returns the signed-in owner, or redirects to /login. Uses getUser(), which

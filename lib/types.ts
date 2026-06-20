@@ -10,6 +10,7 @@ export type Organization = {
   name: string;
   owner_user_id: string;
   subscription_status: string;
+  stripe_customer_id: string | null;
 };
 
 export type Job = {

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * Sends the owner a magic-link sign-in email. shouldCreateUser:true so a brand
@@ -13,6 +14,24 @@ export async function sendMagicLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) {
     redirect("/login?error=" + encodeURIComponent("Enter your email address."));
+  }
+
+  // Optional invite-only mode: only allowlisted emails may request a link.
+  if (process.env.SIGNUP_MODE === "allowlist") {
+    const svc = createServiceClient();
+    const { data } = await svc
+      .from("allowed_emails")
+      .select("email")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+    if (!data) {
+      redirect(
+        "/login?error=" +
+          encodeURIComponent(
+            "This email isn’t approved yet. Contact us for access.",
+          ),
+      );
+    }
   }
 
   const supabase = await createClient();

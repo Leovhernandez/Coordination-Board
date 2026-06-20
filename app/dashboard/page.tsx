@@ -7,6 +7,7 @@ import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
+import { isSubscriptionActive } from "@/lib/stripe";
 import { OrgName } from "./OrgName";
 import { createJob } from "./actions";
 import type { Job, Phase } from "@/lib/types";
@@ -67,13 +68,11 @@ export default async function DashboardPage({
         </form>
       </header>
 
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <Link
           href="/dashboard"
           className={`rounded-full px-3 py-1 text-sm font-medium ${
-            showArchived
-              ? "text-slate-500"
-              : "bg-slate-900 text-white"
+            showArchived ? "text-slate-500" : "bg-slate-900 text-white"
           }`}
         >
           Active
@@ -81,14 +80,28 @@ export default async function DashboardPage({
         <Link
           href="/dashboard?view=archived"
           className={`rounded-full px-3 py-1 text-sm font-medium ${
-            showArchived
-              ? "bg-slate-900 text-white"
-              : "text-slate-500"
+            showArchived ? "bg-slate-900 text-white" : "text-slate-500"
           }`}
         >
           Archived
         </Link>
+        <Link
+          href="/billing"
+          className="ml-auto rounded-full px-3 py-1 text-sm font-medium text-slate-500"
+        >
+          Billing
+        </Link>
       </div>
+
+      {!isSubscriptionActive(org.subscription_status) && (
+        <Link
+          href="/billing"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900"
+        >
+          Your subscription is {org.subscription_status} — subscribe to create
+          jobs →
+        </Link>
+      )}
 
       <section className="flex flex-col gap-3">
         {jobs.length === 0 && (
