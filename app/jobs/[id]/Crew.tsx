@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { addParticipant, revokeParticipant } from "./actions";
 
 export type CrewMember = {
@@ -21,6 +21,11 @@ export function Crew({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // sms: links only make sense on a phone — hide "Text it" on desktop.
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    setIsTouch(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
 
   function onAdd() {
     const n = name.trim();
@@ -80,9 +85,9 @@ export function Crew({
               >
                 {copiedId === m.id ? "Copied!" : "Copy link"}
               </button>
-              {m.phone && (
+              {m.phone && isTouch && (
                 <a
-                  href={`sms:${m.phone}?&body=${encodeURIComponent(
+                  href={`sms:${m.phone}?body=${encodeURIComponent(
                     `Update your phases here: ${m.link}`,
                   )}`}
                   className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 active:bg-slate-100"

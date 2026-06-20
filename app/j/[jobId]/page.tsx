@@ -5,6 +5,7 @@ import {
   getParticipantByToken,
   participantCookieName,
 } from "@/lib/participant";
+import { BroadcastRefresh } from "@/components/BroadcastRefresh";
 import { ParticipantBoard } from "./ParticipantBoard";
 import type { Phase } from "@/lib/types";
 
@@ -49,20 +50,24 @@ export default async function ParticipantPage({
     .select("id, name")
     .eq("id", jobId)
     .maybeSingle();
+  // Only this participant's assigned phases ever leave the server.
   const { data: phasesData } = await supabase
     .from("phases")
     .select("*")
     .eq("job_id", jobId)
+    .eq("assignee_participant_id", participant.id)
     .order("sequence_index", { ascending: true });
-  const phases = (phasesData ?? []) as Phase[];
+  const myPhases = (phasesData ?? []) as Phase[];
 
   return (
-    <ParticipantBoard
-      jobId={jobId}
-      jobName={job?.name ?? "Job"}
-      participantId={participant.id}
-      participantName={participant.name}
-      phases={phases}
-    />
+    <>
+      <BroadcastRefresh jobId={jobId} />
+      <ParticipantBoard
+        jobId={jobId}
+        jobName={job?.name ?? "Job"}
+        participantName={participant.name}
+        phases={myPhases}
+      />
+    </>
   );
 }

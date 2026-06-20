@@ -7,6 +7,7 @@ import {
   getParticipantByToken,
   participantCookieName,
 } from "@/lib/participant";
+import { broadcastJobChange } from "@/lib/realtime";
 import type { PhaseStatus } from "@/lib/types";
 
 /**
@@ -62,4 +63,5 @@ export async function updateAssignedPhase(
   revalidatePath(`/j/${jobId}`);
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/dashboard");
+  await broadcastJobChange(jobId);
 }

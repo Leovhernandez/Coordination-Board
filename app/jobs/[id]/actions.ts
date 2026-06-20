@@ -4,11 +4,22 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { broadcastJobChange } from "@/lib/realtime";
 import type { PhaseStatus } from "@/lib/types";
 
-function revalidateJob(jobId: string) {
+async function revalidateJob(jobId: string) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/dashboard");
+  await broadcastJobChange(jobId); // live-refresh participant boards
+}
+
+/** Renames a job (owner). */
+export async function renameJob(jobId: string, name: string) {
+  const n = name.trim();
+  if (!n) return;
+  const supabase = await createClient();
+  await supabase.from("jobs").update({ name: n }).eq("id", jobId);
+  await revalidateJob(jobId);
 }
 
 /**
@@ -37,7 +48,7 @@ export async function setPhaseStatus(
     .eq("id", phaseId);
   if (error) return;
 
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 /** Appends a new phase to the end of the job's sequence. */
@@ -58,7 +69,7 @@ export async function addPhase(jobId: string, label: string) {
   await supabase
     .from("phases")
     .insert({ job_id: jobId, label: name, sequence_index: nextIndex });
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 /** Renames a phase. */
@@ -72,14 +83,14 @@ export async function renamePhase(
 
   const supabase = await createClient();
   await supabase.from("phases").update({ label: name }).eq("id", phaseId);
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 /** Deletes a phase. Gaps in sequence_index are fine (display numbers by position). */
 export async function deletePhase(phaseId: string, jobId: string) {
   const supabase = await createClient();
   await supabase.from("phases").delete().eq("id", phaseId);
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 /**
@@ -129,7 +140,7 @@ export async function movePhase(
     .update({ sequence_index: neighbor.sequence_index })
     .eq("id", phaseId);
 
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 // --- Crew (link-token participants) ---
@@ -151,7 +162,7 @@ export async function addParticipant(
     phone: phone?.trim() || null,
     invite_token: token,
   });
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 /** Revokes a participant's link (their token stops working immediately). */
@@ -161,7 +172,7 @@ export async function revokeParticipant(participantId: string, jobId: string) {
     .from("participants")
     .update({ revoked: true })
     .eq("id", participantId);
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 /** Assigns (or clears) the participant who may update a phase. */
@@ -175,7 +186,7 @@ export async function assignPhase(
     .from("phases")
     .update({ assignee_participant_id: participantId })
     .eq("id", phaseId);
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }
 
 // --- Archive ---
@@ -192,5 +203,5 @@ export async function archiveJob(jobId: string) {
 export async function unarchiveJob(jobId: string) {
   const supabase = await createClient();
   await supabase.from("jobs").update({ status: "active" }).eq("id", jobId);
-  revalidateJob(jobId);
+  await revalidateJob(jobId);
 }

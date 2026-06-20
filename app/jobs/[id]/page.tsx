@@ -6,6 +6,7 @@ import { participantLink } from "@/lib/participant";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { Board } from "./Board";
 import { Crew } from "./Crew";
+import { JobName } from "./JobName";
 import { archiveJob, unarchiveJob } from "./actions";
 import type { Job, Participant, Phase } from "@/lib/types";
 
@@ -75,14 +76,14 @@ export default async function JobBoardPage({
             </button>
           </form>
         </div>
-        <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900">
-          {job.name}
+        <div className="mt-1.5 flex items-center gap-2">
+          <JobName jobId={job.id} name={job.name} />
           {job.status === "archived" && (
-            <span className="ml-2 align-middle rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
               Archived
             </span>
           )}
-        </h1>
+        </div>
         {(job.customer_name || job.address) && (
           <p className="text-sm text-slate-500">
             {[job.customer_name, job.address].filter(Boolean).join(" · ")}
