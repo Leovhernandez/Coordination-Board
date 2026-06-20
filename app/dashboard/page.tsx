@@ -6,6 +6,7 @@ import { signOut } from "@/app/login/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { createJob } from "./actions";
 import type { Job, Phase } from "@/lib/types";
 
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 p-4">
+      <RealtimeRefresh channelName="phases-dashboard" />
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">

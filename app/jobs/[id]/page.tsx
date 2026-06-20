@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { participantLink } from "@/lib/participant";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { Board } from "./Board";
 import { Crew } from "./Crew";
 import type { Job, Participant, Phase } from "@/lib/types";
@@ -49,6 +50,10 @@ export default async function JobBoardPage({
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-4 p-4">
+      <RealtimeRefresh
+        channelName={`phases-job-${job.id}`}
+        filter={`job_id=eq.${job.id}`}
+      />
       <header>
         <Link
           href="/dashboard"
