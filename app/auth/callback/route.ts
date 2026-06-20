@@ -21,7 +21,19 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(next, request.url));
     }
+    const msg =
+      "Couldn't complete sign-in — open the link in the same browser you " +
+      `requested it from. (${error.message})`;
+    return NextResponse.redirect(
+      new URL("/login?error=" + encodeURIComponent(msg), request.url),
+    );
   }
 
-  return NextResponse.redirect(new URL("/login?error=1", request.url));
+  return NextResponse.redirect(
+    new URL(
+      "/login?error=" +
+        encodeURIComponent("Sign-in link was missing or invalid."),
+      request.url,
+    ),
+  );
 }
