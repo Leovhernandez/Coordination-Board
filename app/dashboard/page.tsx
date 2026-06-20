@@ -7,20 +7,28 @@ import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
+import { OrgName } from "./OrgName";
 import { createJob } from "./actions";
 import type { Job, Phase } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   const org = await getOrCreateOrg();
   if (!org) redirect("/login");
+
+  const showArchived = (await searchParams).view === "archived";
 
   const supabase = await createClient();
   const { data: jobsData } = await supabase
     .from("jobs")
     .select("*")
     .eq("org_id", org.id)
+    .eq("status", showArchived ? "archived" : "active")
     .order("created_at", { ascending: false });
   const jobs = (jobsData ?? []) as Job[];
 
@@ -44,27 +52,50 @@ export default async function DashboardPage() {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 p-4">
       <RealtimeRefresh channelName="phases-dashboard" />
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            {org.name}
-          </h1>
+      <header className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <OrgName name={org.name} />
           <p className="text-sm text-slate-500">
-            {jobs.length} {jobs.length === 1 ? "job" : "jobs"}
+            {jobs.length} {showArchived ? "archived" : "active"}{" "}
+            {jobs.length === 1 ? "job" : "jobs"}
           </p>
         </div>
         <form action={signOut}>
-          <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 active:bg-slate-100">
+          <button className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 active:bg-slate-100">
             Sign out
           </button>
         </form>
       </header>
 
+      <div className="flex gap-2">
+        <Link
+          href="/dashboard"
+          className={`rounded-full px-3 py-1 text-sm font-medium ${
+            showArchived
+              ? "text-slate-500"
+              : "bg-slate-900 text-white"
+          }`}
+        >
+          Active
+        </Link>
+        <Link
+          href="/dashboard?view=archived"
+          className={`rounded-full px-3 py-1 text-sm font-medium ${
+            showArchived
+              ? "bg-slate-900 text-white"
+              : "text-slate-500"
+          }`}
+        >
+          Archived
+        </Link>
+      </div>
+
       <section className="flex flex-col gap-3">
         {jobs.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
-            No jobs yet. Create your first one below — it starts with the
-            standard phases.
+            {showArchived
+              ? "No archived jobs."
+              : "No jobs yet. Create your first one below — it starts with the standard phases."}
           </p>
         )}
 
@@ -116,6 +147,7 @@ export default async function DashboardPage() {
         ))}
       </section>
 
+      {!showArchived && (
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">New job</h2>
         <form action={createJob} className="flex flex-col gap-2.5">
@@ -143,6 +175,7 @@ export default async function DashboardPage() {
           </button>
         </form>
       </section>
+      )}
     </main>
   );
 }

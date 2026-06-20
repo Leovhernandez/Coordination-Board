@@ -2,6 +2,7 @@
 
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { PhaseStatus } from "@/lib/types";
 
@@ -174,5 +175,22 @@ export async function assignPhase(
     .from("phases")
     .update({ assignee_participant_id: participantId })
     .eq("id", phaseId);
+  revalidateJob(jobId);
+}
+
+// --- Archive ---
+
+/** Archives a job (leaves the active list) and returns to the dashboard. */
+export async function archiveJob(jobId: string) {
+  const supabase = await createClient();
+  await supabase.from("jobs").update({ status: "archived" }).eq("id", jobId);
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
+
+/** Restores an archived job to active. */
+export async function unarchiveJob(jobId: string) {
+  const supabase = await createClient();
+  await supabase.from("jobs").update({ status: "active" }).eq("id", jobId);
   revalidateJob(jobId);
 }

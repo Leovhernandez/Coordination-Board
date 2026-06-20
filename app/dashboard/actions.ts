@@ -37,3 +37,21 @@ export async function createJob(formData: FormData) {
 
   revalidatePath("/dashboard");
 }
+
+/** Renames the owner's organization (the name shown on the dashboard). */
+export async function renameOrg(name: string) {
+  const n = name.trim();
+  if (!n) return;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from("organizations")
+    .update({ name: n })
+    .eq("owner_user_id", user.id);
+  revalidatePath("/dashboard");
+}
