@@ -63,6 +63,7 @@ export default async function ParticipantPage({
     <>
       <BroadcastRefresh jobId={jobId} />
       <ParticipantBoard
+        key={myPhases.map((p) => p.id).join(",") || "none"}
         jobId={jobId}
         jobName={job?.name ?? "Job"}
         participantName={participant.name}

@@ -9,8 +9,9 @@ import type { PhaseStatus } from "@/lib/types";
 
 async function revalidateJob(jobId: string) {
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/j/${jobId}`); // crew board — required so router.refresh() sees new assignments
   revalidatePath("/dashboard");
-  await broadcastJobChange(jobId); // live-refresh participant boards
+  await broadcastJobChange(jobId);
 }
 
 /** Renames a job (owner). */

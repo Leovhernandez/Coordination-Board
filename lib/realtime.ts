@@ -1,5 +1,7 @@
 import "server-only";
 
+const topicFor = (jobId: string) => `job-${jobId}`;
+
 /**
  * Fires a Realtime Broadcast on a job's channel from the server (no websocket).
  * Participants use the anon key and can't receive RLS-filtered postgres_changes,
@@ -12,19 +14,25 @@ export async function broadcastJobChange(jobId: string) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return;
 
+  const topic = topicFor(jobId);
+  const endpoint = `${url}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/change`;
+
   try {
-    await fetch(`${url}/realtime/v1/api/broadcast`, {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         apikey: key,
         Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify({
-        messages: [{ topic: `job-${jobId}`, event: "change", payload: {} }],
-      }),
+      body: "{}",
     });
-  } catch {
-    // Best-effort; a missed broadcast just means a participant refreshes manually.
+    if (!res.ok && process.env.NODE_ENV === "development") {
+      console.warn(`broadcastJobChange ${topic}: HTTP ${res.status}`);
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`broadcastJobChange ${topic}:`, err);
+    }
   }
 }
