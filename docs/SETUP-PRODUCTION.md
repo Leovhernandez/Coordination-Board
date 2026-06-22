@@ -27,6 +27,36 @@ blocker for onboarding. Point Supabase Auth at Resend instead.
    you control sending (custom SMTP lifts the tight built-in cap).
 6. Test: request a sign-in link — it should arrive promptly, no rate-limit error.
 
+## 1.5. Magic-link email template — token_hash flow (works on any device)
+
+By default Supabase magic links use the **PKCE code flow** (`?code=…`), which
+only completes in the *same browser* the link was requested from. Non-technical
+owners hit this constantly — they request on their phone, open it in a different
+app's in-app browser, and sign-in fails with "open it in the same browser." The
+app now supports the **token_hash flow** at `/auth/confirm`, which carries its
+own credential and works across browsers/devices. You just have to point the
+email template at it.
+
+1. Supabase → **Authentication → Email Templates → Magic Link**.
+2. Replace the link line (it uses `{{ .ConfirmationURL }}`) so the `href` is:
+
+   ```
+   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink&next=/dashboard
+   ```
+
+   Example full anchor:
+   ```html
+   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink&next=/dashboard">Sign in to Coordination Board</a>
+   ```
+3. Supabase → **Authentication → URL Configuration → Site URL** must be your
+   production URL (`https://coordination.4lfr.com`). `{{ .SiteURL }}` resolves to
+   this, so the link always points at production.
+4. Keep `/auth/confirm` **and** `/auth/callback` (and `/dashboard`) in **Redirect
+   URLs** — `/auth/callback` stays as a PKCE fallback for any links already sent.
+5. Test from a **different** browser than you requested from (e.g. request in
+   Chrome, open in Safari) — it should sign you straight in. That's the whole
+   point of the switch.
+
 ## 2. Plan upgrades (commercial readiness)
 
 - **Supabase Pro (~$25/mo):** removes the free-tier 7-day inactivity pause (a
@@ -42,6 +72,8 @@ it before onboarding companies that depend on uptime.
 
 ## 3. Quick pre-onboarding checklist
 - [ ] Resend SMTP configured + a test email received
+- [ ] Magic Link template switched to token_hash (`/auth/confirm`) + tested cross-browser
+- [ ] Site URL = production; `/auth/confirm` in Redirect URLs
 - [ ] Supabase Pro
 - [ ] Vercel Pro
 - [ ] All 5 required env vars set in Vercel (see `.env.local.example`)

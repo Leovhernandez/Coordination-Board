@@ -42,7 +42,10 @@ export async function sendMagicLink(formData: FormData) {
     email,
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: `${origin}/auth/callback`,
+      // token_hash flow lands on /auth/confirm (works across browsers/devices).
+      // The email template controls the actual link; this keeps the redirect
+      // allowlisted. /auth/callback remains a PKCE fallback for old links.
+      emailRedirectTo: `${origin}/auth/confirm`,
     },
   });
 

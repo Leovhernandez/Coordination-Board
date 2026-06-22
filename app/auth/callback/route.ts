@@ -2,13 +2,16 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Magic-link landing (PKCE code flow). Supabase's default email templates send
- * the user here with a `?code=...`; we exchange it for a session and write the
- * auth cookies. No email-template customization required.
+ * Magic-link landing — PKCE code flow (FALLBACK).
  *
- * Same-device note: the PKCE code_verifier is stored in a cookie when the link
- * is requested, so the link should be opened on the same browser/device. That
- * matches an owner requesting + tapping the link on their own phone.
+ * The primary flow is now token_hash at /auth/confirm, which works across
+ * browsers/devices. This route is kept so links from the previous email
+ * template (or any sent before the template is switched) still complete: it
+ * exchanges a `?code=...` for a session and writes the auth cookies.
+ *
+ * Same-device caveat (why we moved off this as the default): the PKCE
+ * code_verifier is stored in a cookie when the link is requested, so a `?code`
+ * link must be opened in the same browser/device it was requested from.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
