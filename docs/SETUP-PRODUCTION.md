@@ -41,13 +41,17 @@ email template at it.
 2. Replace the link line (it uses `{{ .ConfirmationURL }}`) so the `href` is:
 
    ```
-   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink&next=/dashboard
+   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard
    ```
 
    Example full anchor:
    ```html
-   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink&next=/dashboard">Sign in to Coordination Board</a>
+   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard">Sign in to Coordination Board</a>
    ```
+
+   > **Use `type=email`, not `type=magiclink`.** The hashed-token verify endpoint
+   > expects `email`; `magiclink` fails on every click. (The app's `/auth/confirm`
+   > route now forces `email` regardless, so this is belt-and-suspenders.)
 3. Supabase → **Authentication → URL Configuration → Site URL** must be your
    production URL (`https://coordination.4lfr.com`). `{{ .SiteURL }}` resolves to
    this, so the link always points at production.

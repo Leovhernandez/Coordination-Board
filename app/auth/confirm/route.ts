@@ -1,35 +1,39 @@
-import { type EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
  * Magic-link landing. Handles BOTH sign-in styles, so it works no matter how the
  * Supabase email template is configured:
- *   - token_hash flow (custom template) → carries its own credential, so the link
- *     works across browsers/devices (fixes the "open it in the same browser"
- *     gotcha for non-technical owners). This is the preferred flow.
- *   - PKCE code flow (Supabase's default template) → same-browser; kept as the
- *     fallback so sign-in works before the template is switched.
+ *   - token_hash flow (custom template) → works across browsers/devices.
+ *   - PKCE code flow (Supabase default template) → same-browser fallback.
+ *
+ * IMPORTANT: the hashed-token verify endpoint expects type **'email'** (per
+ * @supabase/auth-js docs), even though the magic-link template often labels the
+ * link `type=magiclink`. We therefore ignore the template's `type` and always
+ * verify token_hash as 'email' — otherwise verifyOtp fails on every click.
  *
  * /auth/callback also remains for any links already sitting in inboxes.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
 
   const supabase = await createClient();
 
-  // Preferred: token_hash (works cross-device).
-  if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash });
+  // Preferred: token_hash (works cross-device). Always verified as 'email'.
+  if (token_hash) {
+    const { error } = await supabase.auth.verifyOtp({
+      type: "email",
+      token_hash,
+    });
     if (!error) return NextResponse.redirect(new URL(next, request.url));
+    console.error("[auth/confirm] token_hash verify failed:", error.message);
     return fail(
       request,
-      "This sign-in link has expired or was already used — request a fresh " +
-        `one. (${error.message})`,
+      "Sign-in link couldn't be verified — request a fresh one. " +
+        `(${error.message})`,
     );
   }
 
@@ -37,6 +41,7 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return NextResponse.redirect(new URL(next, request.url));
+    console.error("[auth/confirm] code exchange failed:", error.message);
     return fail(
       request,
       "Couldn't complete sign-in — open the link in the same browser you " +
