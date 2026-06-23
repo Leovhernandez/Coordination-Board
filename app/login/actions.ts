@@ -42,10 +42,11 @@ export async function sendMagicLink(formData: FormData) {
     email,
     options: {
       shouldCreateUser: true,
-      // token_hash flow lands on /auth/confirm (works across browsers/devices).
-      // The email template controls the actual link; this keeps the redirect
-      // allowlisted. /auth/callback remains a PKCE fallback for old links.
-      emailRedirectTo: `${origin}/auth/confirm`,
+      // Proven code flow: Supabase verifies the link, then redirects here with a
+      // ?code= that /auth/callback exchanges for a session. This is the flow that
+      // ran the whole pilot. (Cross-device token_hash sign-in is being rebuilt
+      // separately on a preview deploy before it touches production again.)
+      emailRedirectTo: `${origin}/auth/callback`,
     },
   });
 
