@@ -3,41 +3,52 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Magic-link landing (token_hash flow). The Supabase email template sends the
- * owner here with `?token_hash=...&type=...`; we verify it straight into a
- * session. Unlike the PKCE code flow, the token_hash carries its own credential,
- * so the link works even when opened in a different browser or on a different
- * device than it was requested from — removing the #1 sign-in failure for
- * non-technical owners (the "open it in the same browser" gotcha).
+ * Magic-link landing. Handles BOTH sign-in styles, so it works no matter how the
+ * Supabase email template is configured:
+ *   - token_hash flow (custom template) → carries its own credential, so the link
+ *     works across browsers/devices (fixes the "open it in the same browser"
+ *     gotcha for non-technical owners). This is the preferred flow.
+ *   - PKCE code flow (Supabase's default template) → same-browser; kept as the
+ *     fallback so sign-in works before the template is switched.
  *
- * The old PKCE route still lives at /auth/callback as a fallback, so links from
- * the previous email template (or before the template is switched) keep working.
+ * /auth/callback also remains for any links already sitting in inboxes.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
+  const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
 
+  const supabase = await createClient();
+
+  // Preferred: token_hash (works cross-device).
   if (token_hash && type) {
-    const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
-    if (!error) {
-      return NextResponse.redirect(new URL(next, request.url));
-    }
-    const msg =
+    if (!error) return NextResponse.redirect(new URL(next, request.url));
+    return fail(
+      request,
       "This sign-in link has expired or was already used — request a fresh " +
-      `one. (${error.message})`;
-    return NextResponse.redirect(
-      new URL("/login?error=" + encodeURIComponent(msg), request.url),
+        `one. (${error.message})`,
     );
   }
 
+  // Fallback: PKCE code (Supabase default template; same browser only).
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) return NextResponse.redirect(new URL(next, request.url));
+    return fail(
+      request,
+      "Couldn't complete sign-in — open the link in the same browser you " +
+        `requested it from. (${error.message})`,
+    );
+  }
+
+  return fail(request, "Sign-in link was missing or invalid.");
+}
+
+function fail(request: NextRequest, message: string) {
   return NextResponse.redirect(
-    new URL(
-      "/login?error=" +
-        encodeURIComponent("Sign-in link was missing or invalid."),
-      request.url,
-    ),
+    new URL("/login?error=" + encodeURIComponent(message), request.url),
   );
 }
