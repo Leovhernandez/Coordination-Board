@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getOrCreateOrg } from "@/lib/auth";
+import { getSessionContext } from "@/lib/membership";
 import { isAccessAllowed } from "@/lib/stripe";
 import { DEFAULT_PHASES } from "@/lib/phases";
 
@@ -19,8 +19,9 @@ export async function createJob(formData: FormData) {
   const address = String(formData.get("address") ?? "").trim() || null;
   const customerName = String(formData.get("customer_name") ?? "").trim() || null;
 
-  const org = await getOrCreateOrg();
-  if (!org) return;
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+  const { org, member } = ctx;
 
   // Billing gate: active, or trialing within the trial window (M8/M8.5).
   if (!isAccessAllowed(org.subscription_status, org.trial_ends_at)) {
@@ -28,9 +29,17 @@ export async function createJob(formData: FormData) {
   }
 
   const supabase = await createClient();
+  // Stamp the creating member so multi-seat RLS scopes the job to its salesman
+  // (the owner sees all org jobs; a salesman sees only the ones they created).
   const { data: job, error } = await supabase
     .from("jobs")
-    .insert({ org_id: org.id, name, address, customer_name: customerName })
+    .insert({
+      org_id: org.id,
+      name,
+      address,
+      customer_name: customerName,
+      salesman_member_id: member.id,
+    })
     .select("id")
     .single();
   if (error || !job) return;

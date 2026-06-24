@@ -23,6 +23,9 @@ export type Job = {
   customer_name: string | null;
   status: JobStatus;
   created_at: string;
+  // M14: which salesman member owns this job (null for pre-M14 rows until
+  // backfilled). The owner sees all; a salesman sees only their own.
+  salesman_member_id: string | null;
 };
 
 export type Phase = {

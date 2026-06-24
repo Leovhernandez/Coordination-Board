@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getOrCreateOrg } from "@/lib/auth";
+import { getSessionContext } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
@@ -21,8 +21,9 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
-  const org = await getOrCreateOrg();
-  if (!org) redirect("/login");
+  const ctx = await getSessionContext();
+  if (!ctx) redirect("/login");
+  const { org, isOwner } = ctx;
 
   const showArchived = (await searchParams).view === "archived";
 
@@ -91,12 +92,22 @@ export default async function DashboardPage({
         >
           Archived
         </Link>
-        <Link
-          href="/billing"
-          className="ml-auto rounded-full px-3 py-1 text-sm font-medium text-slate-500"
-        >
-          Billing
-        </Link>
+        {isOwner && (
+          <Link
+            href="/dashboard/team"
+            className="ml-auto rounded-full px-3 py-1 text-sm font-medium text-slate-500"
+          >
+            Team
+          </Link>
+        )}
+        {isOwner && (
+          <Link
+            href="/billing"
+            className="rounded-full px-3 py-1 text-sm font-medium text-slate-500"
+          >
+            Billing
+          </Link>
+        )}
         {admin && (
           <Link
             href="/admin"
