@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getOrCreateOrg } from "@/lib/auth";
+import { getSessionContext } from "@/lib/membership";
 import { isStripeConfigured, isAccessAllowed } from "@/lib/stripe";
 import { startCheckout, openBillingPortal } from "./actions";
 
@@ -14,8 +14,10 @@ const STATUS_COPY: Record<string, string> = {
 };
 
 export default async function BillingPage() {
-  const org = await getOrCreateOrg();
-  if (!org) redirect("/login");
+  const ctx = await getSessionContext();
+  if (!ctx) redirect("/login");
+  if (!ctx.isOwner) redirect("/dashboard"); // billing is owner-only (salesmen never see it)
+  const { org } = ctx;
 
   const active = isAccessAllowed(org.subscription_status, org.trial_ends_at);
   const planLabel = process.env.NEXT_PUBLIC_PLAN_LABEL ?? "Monthly plan";
