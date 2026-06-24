@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getSessionContext } from "@/lib/membership";
+import { getSessionContext, countSalesmen } from "@/lib/membership";
 
 /**
  * Owner invites a salesman by email. Creates a pending org_members row (user_id
@@ -31,6 +31,13 @@ export async function inviteSalesman(formData: FormData) {
   if (existing) {
     revalidatePath("/dashboard/team");
     return;
+  }
+
+  // Seat cap (revenue-protection): an owner can't invite past their limit.
+  const used = await countSalesmen(ctx.org.id);
+  if (used >= ctx.org.salesman_seat_limit) {
+    revalidatePath("/dashboard/team");
+    return; // the Team page shows "seats full" when used >= limit
   }
 
   await svc.from("org_members").insert({

@@ -13,6 +13,8 @@ export type Organization = {
   subscription_status: string;
   stripe_customer_id: string | null;
   trial_ends_at: string | null;
+  // M14: max salesmen the owner may invite (admin-adjustable per business).
+  salesman_seat_limit: number;
 };
 
 export type Job = {

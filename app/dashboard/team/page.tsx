@@ -13,6 +13,8 @@ export default async function TeamPage() {
 
   const members = await listMembers(ctx.org.id);
   const salesmen = members.filter((m) => m.role === "salesman");
+  const limit = ctx.org.salesman_seat_limit;
+  const seatsFull = salesmen.length >= limit;
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 p-4">
@@ -32,39 +34,46 @@ export default async function TeamPage() {
         </p>
       </header>
 
-      <form
-        action={inviteSalesman}
-        className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-      >
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Name
-          <input
-            name="name"
-            required
-            placeholder="Salesman name"
-            className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-          Email
-          <input
-            name="email"
-            type="email"
-            required
-            inputMode="email"
-            autoComplete="off"
-            placeholder="salesman@company.com"
-            className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-          />
-        </label>
-        <button className="mt-1 rounded-lg bg-slate-900 px-4 py-2.5 text-base font-semibold text-white active:bg-slate-700">
-          Invite salesman
-        </button>
-      </form>
+      {seatsFull ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
+          You&apos;ve used all {limit} salesman seats. Remove one below, or
+          contact us to raise your limit.
+        </div>
+      ) : (
+        <form
+          action={inviteSalesman}
+          className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+        >
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Name
+            <input
+              name="name"
+              required
+              placeholder="Salesman name"
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Email
+            <input
+              name="email"
+              type="email"
+              required
+              inputMode="email"
+              autoComplete="off"
+              placeholder="salesman@company.com"
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+            />
+          </label>
+          <button className="mt-1 rounded-lg bg-slate-900 px-4 py-2.5 text-base font-semibold text-white active:bg-slate-700">
+            Invite salesman
+          </button>
+        </form>
+      )}
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-slate-500">
-          Salesmen ({salesmen.length})
+          Salesmen ({salesmen.length}/{limit})
         </h2>
         {salesmen.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
