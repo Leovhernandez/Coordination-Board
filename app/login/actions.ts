@@ -3,12 +3,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { isSignInAllowed } from "@/lib/access";
 
 /**
- * Sends the owner a magic-link sign-in email. shouldCreateUser:true so a brand
- * new contractor self-serves (multi-tenant: each owner gets their own org on
- * first login). The email link lands on /auth/confirm (token_hash flow).
+ * Sends a magic-link sign-in email. Access is admin-gated (M14): only approved
+ * business owners and invited salesmen may sign in — everyone else is turned
+ * away here, before any session exists. A new owner gets their org on first
+ * login; an invited salesman is linked to their org.
  */
 export async function sendMagicLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -16,22 +17,14 @@ export async function sendMagicLink(formData: FormData) {
     redirect("/login?error=" + encodeURIComponent("Enter your email address."));
   }
 
-  // Optional invite-only mode: only allowlisted emails may request a link.
-  if (process.env.SIGNUP_MODE === "allowlist") {
-    const svc = createServiceClient();
-    const { data } = await svc
-      .from("allowed_emails")
-      .select("email")
-      .eq("email", email.toLowerCase())
-      .maybeSingle();
-    if (!data) {
-      redirect(
-        "/login?error=" +
-          encodeURIComponent(
-            "This email isn’t approved yet. Contact us for access.",
-          ),
-      );
-    }
+  // Admin-gated access: business owners (allowlist) + invited salesmen only.
+  if (!(await isSignInAllowed(email))) {
+    redirect(
+      "/login?error=" +
+        encodeURIComponent(
+          "This email isn’t approved yet. Ask your contractor for an invite, or contact us for access.",
+        ),
+    );
   }
 
   const supabase = await createClient();

@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getOrCreateOrg } from "@/lib/auth";
+import { isBusinessOwnerEmail } from "@/lib/access";
 import type { Organization } from "@/lib/types";
 
 /**
@@ -31,29 +32,33 @@ export type SessionContext = {
 
 const MEMBER_COLUMNS = "id, org_id, user_id, role, name, email";
 const ORG_COLUMNS =
-  "id, name, owner_user_id, owner_email, subscription_status, stripe_customer_id, trial_ends_at";
+  "id, name, owner_user_id, owner_email, subscription_status, stripe_customer_id, trial_ends_at, salesman_seat_limit";
 
 type Svc = ReturnType<typeof createServiceClient>;
 
-/**
- * Resolve the caller's membership, claiming a pending invite on first sign-in.
- * Uses the service-role client because a pending invite row (user_id null) is
- * not readable under the member's own RLS. Safe: we match strictly on the
- * authenticated user's verified email.
- */
-async function resolveMember(
+/** A membership already linked to this auth user (existing owner or salesman). */
+async function findLinkedMember(
   svc: Svc,
   userId: string,
-  email: string | null,
 ): Promise<Member | null> {
-  const { data: linked } = await svc
+  const { data } = await svc
     .from("org_members")
     .select(MEMBER_COLUMNS)
     .eq("user_id", userId)
     .maybeSingle();
-  if (linked) return linked as Member;
+  return (data as Member) ?? null;
+}
 
-  if (!email) return null;
+/**
+ * Claim a pending salesman invite matching this email, linking it to the user.
+ * Service-role because a pending row (user_id null) isn't readable under the
+ * invitee's own RLS. Safe: matched strictly on the verified email.
+ */
+async function claimPendingInvite(
+  svc: Svc,
+  userId: string,
+  email: string,
+): Promise<Member | null> {
   const { data: pending } = await svc
     .from("org_members")
     .select(MEMBER_COLUMNS)
@@ -61,7 +66,6 @@ async function resolveMember(
     .ilike("email", email)
     .maybeSingle();
   if (!pending) return null;
-
   const { data: claimed } = await svc
     .from("org_members")
     .update({ user_id: userId })
@@ -69,6 +73,28 @@ async function resolveMember(
     .select(MEMBER_COLUMNS)
     .single();
   return (claimed as Member) ?? (pending as Member);
+}
+
+/** Build the session context from a resolved membership + its org. */
+async function contextFor(
+  svc: Svc,
+  userId: string,
+  email: string | null,
+  member: Member,
+): Promise<SessionContext | null> {
+  const { data: org } = await svc
+    .from("organizations")
+    .select(ORG_COLUMNS)
+    .eq("id", member.org_id)
+    .maybeSingle();
+  if (!org) return null;
+  return {
+    userId,
+    email,
+    org: org as Organization,
+    member,
+    isOwner: member.role === "owner",
+  };
 }
 
 /** Ensure the owner of a (possibly brand-new) org has an owner membership row. */
@@ -101,11 +127,13 @@ async function ensureOwnerMember(
 }
 
 /**
- * The signed-in user's org + membership. Three cases:
- *  - existing member (owner or salesman) → their org
- *  - invited salesman, first sign-in → claim the invite, their org
- *  - brand-new user → create their own org and become its owner
- * Returns null if not signed in.
+ * The signed-in user's org + membership, resolved in priority order:
+ *  1. already a member (existing owner or linked salesman) → their org
+ *  2. admin-approved business owner (or existing org owner) → owner of their org
+ *     (this OUTRANKS any salesman invite, so an owner can't be captured)
+ *  3. invited salesman, first sign-in → claim the invite, salesman of that org
+ *  4. otherwise (signed in but neither approved nor invited) → null (no access)
+ * Returns null if not signed in OR if the user has no access.
  */
 export async function getSessionContext(): Promise<SessionContext | null> {
   const supabase = await createClient();
@@ -115,40 +143,41 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   if (!user) return null;
 
   const svc = createServiceClient();
-  const member = await resolveMember(svc, user.id, user.email ?? null);
+  const email = user.email ?? null;
 
-  if (member) {
-    const { data: org } = await svc
-      .from("organizations")
-      .select(ORG_COLUMNS)
-      .eq("id", member.org_id)
-      .maybeSingle();
+  // 1. Already a member.
+  const linked = await findLinkedMember(svc, user.id);
+  if (linked) return contextFor(svc, user.id, email, linked);
+
+  // 2. Owner precedence: only the admin grants owner status (the allowlist), so
+  //    owners can't mint a second free business and can't be pulled into another
+  //    org as a salesman.
+  if (email && (await isBusinessOwnerEmail(email))) {
+    const org = await getOrCreateOrg();
     if (!org) return null;
-    return {
-      userId: user.id,
-      email: user.email ?? null,
-      org: org as Organization,
-      member,
-      isOwner: member.role === "owner",
-    };
+    const member = await ensureOwnerMember(svc, org, user.id, email);
+    return { userId: user.id, email, org, member, isOwner: true };
   }
 
-  // Brand-new user → owner of a fresh org (reuses the trial/admin logic).
-  const org = await getOrCreateOrg();
-  if (!org) return null;
-  const ownerMember = await ensureOwnerMember(
-    svc,
-    org,
-    user.id,
-    user.email ?? null,
-  );
-  return {
-    userId: user.id,
-    email: user.email ?? null,
-    org,
-    member: ownerMember,
-    isOwner: true,
-  };
+  // 3. Invited salesman → claim on first sign-in.
+  if (email) {
+    const claimed = await claimPendingInvite(svc, user.id, email);
+    if (claimed) return contextFor(svc, user.id, email, claimed);
+  }
+
+  // 4. No access.
+  return null;
+}
+
+/** Count active salesmen in an org (for the per-org seat cap). */
+export async function countSalesmen(orgId: string): Promise<number> {
+  const svc = createServiceClient();
+  const { count } = await svc
+    .from("org_members")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("role", "salesman");
+  return count ?? 0;
 }
 
 /** Owner-only: list the org's members (owner first, then salesmen by name). */
