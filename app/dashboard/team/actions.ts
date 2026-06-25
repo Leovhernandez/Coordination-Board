@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getSessionContext, countSalesmen } from "@/lib/membership";
+import { sendSalesmanInvite } from "@/lib/invites";
 
 /**
  * Owner invites a salesman by email. Creates a pending org_members row (user_id
@@ -46,6 +47,9 @@ export async function inviteSalesman(formData: FormData) {
     name,
     role: "salesman",
   });
+
+  // Email them a one-tap sign-in link — onboarding is hands-off for the owner.
+  await sendSalesmanInvite(email, ctx.org.name);
   revalidatePath("/dashboard/team");
 }
 
