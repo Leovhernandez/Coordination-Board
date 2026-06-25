@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   addAllowedEmail,
+  addSalesmanToOrg,
   deleteAccount,
   removeAllowedEmail,
   setOrgStatus,
@@ -94,6 +95,25 @@ export default async function AdminPage() {
                   </ConfirmSubmit>
                 </form>
               </div>
+              <form
+                action={addSalesmanToOrg.bind(null, o.id)}
+                className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2"
+              >
+                <input
+                  name="name"
+                  placeholder="Salesman name"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
+                />
+                <input
+                  name="email"
+                  type="email"
+                  placeholder="salesman@email.com"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
+                />
+                <button className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white">
+                  Add salesman
+                </button>
+              </form>
             </div>
           );
         })}

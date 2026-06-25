@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
+import { sendSalesmanInvite } from "@/lib/invites";
 
 async function guard() {
   await requireAdmin();
@@ -52,5 +53,53 @@ export async function removeAllowedEmail(email: string) {
 export async function deleteAccount(orgId: string) {
   const svc = await guard();
   await svc.from("organizations").delete().eq("id", orgId);
+  revalidatePath("/admin");
+}
+
+/**
+ * Admin adds a salesman under an owner's org (for onboarding owners who'd rather
+ * hand you the list). Same effect as the owner inviting from Team: respects the
+ * seat cap and emails the salesman a sign-in link.
+ */
+export async function addSalesmanToOrg(orgId: string, formData: FormData) {
+  const svc = await guard();
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  if (!name || !email) return;
+
+  const { data: org } = await svc
+    .from("organizations")
+    .select("name, salesman_seat_limit")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (!org) return;
+
+  const { data: existing } = await svc
+    .from("org_members")
+    .select("id")
+    .eq("org_id", orgId)
+    .ilike("email", email)
+    .maybeSingle();
+  if (existing) {
+    revalidatePath("/admin");
+    return;
+  }
+
+  const { count } = await svc
+    .from("org_members")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("role", "salesman");
+  if ((count ?? 0) >= org.salesman_seat_limit) {
+    revalidatePath("/admin");
+    return; // seat cap reached
+  }
+
+  await svc
+    .from("org_members")
+    .insert({ org_id: orgId, email, name, role: "salesman" });
+  await sendSalesmanInvite(email, org.name);
   revalidatePath("/admin");
 }
