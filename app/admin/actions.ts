@@ -44,23 +44,13 @@ export async function removeAllowedEmail(email: string) {
   revalidatePath("/admin");
 }
 
-export async function addOversight(formData: FormData) {
+/**
+ * Permanently delete an account (org) and everything under it — jobs, phases,
+ * participants, and members all cascade. For clearing test/abandoned businesses
+ * so the Accounts list doesn't grow forever. Admin-only; the UI confirms first.
+ */
+export async function deleteAccount(orgId: string) {
   const svc = await guard();
-  const overseer = String(formData.get("overseer") ?? "").trim().toLowerCase();
-  const gc = String(formData.get("gc") ?? "").trim().toLowerCase();
-  if (!overseer || !gc || overseer === gc) return;
-  await svc
-    .from("company_oversight")
-    .upsert({ overseer_email: overseer, gc_email: gc });
-  revalidatePath("/admin");
-}
-
-export async function removeOversight(overseer: string, gc: string) {
-  const svc = await guard();
-  await svc
-    .from("company_oversight")
-    .delete()
-    .eq("overseer_email", overseer)
-    .eq("gc_email", gc);
+  await svc.from("organizations").delete().eq("id", orgId);
   revalidatePath("/admin");
 }
