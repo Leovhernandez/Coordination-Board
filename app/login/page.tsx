@@ -3,7 +3,7 @@ import { sendMagicLink } from "./actions";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string; error?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string; email?: string }>;
 }) {
   const sp = await searchParams;
 
@@ -33,6 +33,7 @@ export default async function LoginPage({
               required
               autoComplete="email"
               inputMode="email"
+              defaultValue={sp.email ?? ""}
               placeholder="you@company.com"
               className="rounded-lg border border-slate-300 px-3 py-3 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />

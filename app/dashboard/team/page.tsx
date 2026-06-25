@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionContext, listMembers } from "@/lib/membership";
 import { inviteSalesman, removeSalesman } from "./actions";
+import { CopyInviteLink } from "./CopyInviteLink";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +30,10 @@ export default async function TeamPage() {
           Team
         </h1>
         <p className="text-sm text-slate-500">
-          Invite your salesmen by email. They sign in with the same one-tap link
-          — no extra setup — and see only their own jobs. You see everyone&apos;s.
+          Invite a salesman by email below. Then tap <strong>Copy link</strong>{" "}
+          next to their name and text it to them — it opens sign-in with their
+          email already filled in. They see only their own jobs; you see
+          everyone&apos;s.
         </p>
       </header>
 
@@ -99,6 +102,7 @@ export default async function TeamPage() {
               >
                 {m.user_id ? "Joined" : "Invited"}
               </span>
+              {!m.user_id && <CopyInviteLink email={m.email} />}
               <form action={removeSalesman.bind(null, m.id)}>
                 <button className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 active:bg-slate-100">
                   Remove

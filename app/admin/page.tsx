@@ -3,12 +3,12 @@ import { requireAdmin } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   addAllowedEmail,
-  addOversight,
+  deleteAccount,
   removeAllowedEmail,
-  removeOversight,
   setOrgStatus,
   setTrialDays,
 } from "./actions";
+import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +37,6 @@ export default async function AdminPage() {
     .select("email")
     .order("email");
   const allowed = allowedData ?? [];
-
-  const { data: oversightData } = await svc
-    .from("company_oversight")
-    .select("overseer_email, gc_email")
-    .order("overseer_email");
-  const oversight = oversightData ?? [];
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-6 p-4">
@@ -91,19 +85,29 @@ export default async function AdminPage() {
                 <form action={setOrgStatus.bind(null, o.id, "canceled")}>
                   <button className={chipBtn}>Cancel</button>
                 </form>
+                <form action={deleteAccount.bind(null, o.id)}>
+                  <ConfirmSubmit
+                    message={`Permanently delete ${o.owner_email ?? o.name} and ALL their jobs? This cannot be undone.`}
+                    className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 active:bg-red-50"
+                  >
+                    Delete
+                  </ConfirmSubmit>
+                </form>
               </div>
             </div>
           );
         })}
       </section>
 
-      {/* Allowlist */}
+      {/* Owner List */}
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-slate-900">
-          Allowlist ({allowed.length})
+          Owner List ({allowed.length})
         </h2>
         <p className="text-xs text-slate-500">
-          Only used when <code>SIGNUP_MODE=allowlist</code>.
+          Approved <strong>business owners</strong>. An email here can sign in,
+          gets its own company, and can invite its own salesmen. Salesmen are
+          invited by their owner — they are <em>not</em> added here.
         </p>
         {allowed.map((a) => (
           <div
@@ -119,52 +123,10 @@ export default async function AdminPage() {
           </div>
         ))}
         <form action={addAllowedEmail} className="flex gap-2">
-          <input name="email" type="email" placeholder="email@company.com" className={inputCls} />
+          <input name="email" type="email" placeholder="owner@company.com" className={inputCls} />
           <button className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
             Add
           </button>
-        </form>
-      </section>
-
-      {/* Company oversight */}
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Company oversight ({oversight.length})
-        </h2>
-        <p className="text-xs text-slate-500">
-          An overseer email gets a read-only roll-up of each GC email&apos;s
-          jobs.
-        </p>
-        {oversight.map((row) => (
-          <div
-            key={`${row.overseer_email}|${row.gc_email}`}
-            className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-          >
-            <span className="truncate">
-              {row.overseer_email} <span className="text-slate-400">reads</span>{" "}
-              {row.gc_email}
-            </span>
-            <form
-              action={removeOversight.bind(
-                null,
-                row.overseer_email,
-                row.gc_email,
-              )}
-            >
-              <button className="text-xs font-medium text-red-600">
-                Remove
-              </button>
-            </form>
-          </div>
-        ))}
-        <form action={addOversight} className="flex flex-col gap-2">
-          <input name="overseer" type="email" placeholder="Company owner email" className={inputCls} />
-          <div className="flex gap-2">
-            <input name="gc" type="email" placeholder="GC email he can read" className={inputCls} />
-            <button className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
-              Link
-            </button>
-          </div>
         </form>
       </section>
     </main>
