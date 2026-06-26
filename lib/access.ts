@@ -40,10 +40,14 @@ export async function isSignInAllowed(email: string): Promise<boolean> {
   if (await isBusinessOwnerEmail(email)) return true;
 
   const svc = createServiceClient();
-  const { data: invite } = await svc
+  // NOTE: an email can have MULTIPLE org_members rows (invited to >1 org, or a
+  // legacy self-org plus an invite), so we must not use .maybeSingle() here —
+  // it errors on >1 row and would wrongly deny a real invitee. limit(1) just
+  // asks "does at least one invite exist?".
+  const { data: invites } = await svc
     .from("org_members")
     .select("id")
     .ilike("email", email.trim().toLowerCase())
-    .maybeSingle();
-  return !!invite;
+    .limit(1);
+  return !!invites && invites.length > 0;
 }

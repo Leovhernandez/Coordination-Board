@@ -41,12 +41,17 @@ async function findLinkedMember(
   svc: Svc,
   userId: string,
 ): Promise<Member | null> {
+  // A user could be linked to >1 org_members row (e.g. claimed an invite while
+  // also holding a legacy self-org owner row), so don't use .maybeSingle() —
+  // it errors on multiple rows. Owner rows first so a legacy owner row is the
+  // stable pick; isOwner is still decided later by the live Owner List, not role.
   const { data } = await svc
     .from("org_members")
     .select(MEMBER_COLUMNS)
     .eq("user_id", userId)
-    .maybeSingle();
-  return (data as Member) ?? null;
+    .order("role", { ascending: true })
+    .limit(1);
+  return ((data as Member[]) ?? [])[0] ?? null;
 }
 
 /**
@@ -59,20 +64,24 @@ async function claimPendingInvite(
   userId: string,
   email: string,
 ): Promise<Member | null> {
-  const { data: pending } = await svc
+  // An email may have pending invites in several orgs; claim the first (don't
+  // use .maybeSingle(), which errors on >1 row). One person = one active org
+  // membership in this model, so a single claim is correct.
+  const { data: pendingRows } = await svc
     .from("org_members")
     .select(MEMBER_COLUMNS)
     .is("user_id", null)
     .ilike("email", email)
-    .maybeSingle();
+    .limit(1);
+  const pending = ((pendingRows as Member[]) ?? [])[0];
   if (!pending) return null;
   const { data: claimed } = await svc
     .from("org_members")
     .update({ user_id: userId })
-    .eq("id", (pending as Member).id)
+    .eq("id", pending.id)
     .select(MEMBER_COLUMNS)
     .single();
-  return (claimed as Member) ?? (pending as Member);
+  return (claimed as Member) ?? pending;
 }
 
 /**
