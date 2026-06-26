@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionContext } from "@/lib/membership";
+import { getSessionContext, listMembers, type Member } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
@@ -10,6 +10,7 @@ import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { isAccessAllowed } from "@/lib/stripe";
 import { isAdminEmail } from "@/lib/admin";
 import { OrgName } from "./OrgName";
+import { MemberName } from "./MemberName";
 import { createJob } from "./actions";
 import type { Job, Phase } from "@/lib/types";
 
@@ -22,11 +23,13 @@ export default async function DashboardPage({
 }) {
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login");
-  const { org, isOwner } = ctx;
+  const { org, isOwner, email, member } = ctx;
 
   const showArchived = (await searchParams).view === "archived";
 
   const supabase = await createClient();
+  // RLS-scoped: an owner gets every job in the org (their own + all salesmen's);
+  // a salesman gets only their own. We partition the owner's set below.
   const { data: jobsData } = await supabase
     .from("jobs")
     .select("*")
@@ -52,17 +55,81 @@ export default async function DashboardPage({
     phasesByJob.set(p.job_id, list);
   }
 
-  const admin = isAdminEmail(org.owner_email);
+  // Admin link is for the operator only — gate on the SIGNED-IN user's email,
+  // never the org owner's (a salesman in the admin's org must not see it).
+  const admin = isAdminEmail(email);
+
+  // Owner view splits into "my jobs" (editable) and a read-only roll-up of each
+  // salesman's jobs. A salesman only ever sees their own jobs (no roll-up).
+  const ownJobs = isOwner
+    ? jobs.filter((j) => !j.salesman_member_id || j.salesman_member_id === member.id)
+    : jobs;
+
+  const salesmenGroups: { member: Member; jobs: Job[] }[] = [];
+  if (isOwner) {
+    const members = await listMembers(org.id);
+    const memberById = new Map(members.map((m) => [m.id, m] as const));
+    const grouped = new Map<string, Job[]>();
+    for (const j of jobs) {
+      if (j.salesman_member_id && j.salesman_member_id !== member.id) {
+        const list = grouped.get(j.salesman_member_id) ?? [];
+        list.push(j);
+        grouped.set(j.salesman_member_id, list);
+      }
+    }
+    for (const [mid, mjobs] of grouped) {
+      const m = memberById.get(mid);
+      if (m) salesmenGroups.push({ member: m, jobs: mjobs });
+    }
+    salesmenGroups.sort((a, b) => a.member.name.localeCompare(b.member.name));
+  }
+
+  // Shared read-only summary used by both my-jobs cards and roll-up cards.
+  const summary = (job: Job) => (
+    <>
+      {(job.address || job.customer_name) && (
+        <p className="mt-0.5 text-xs text-slate-500">
+          {[job.customer_name, job.address].filter(Boolean).join(" · ")}
+        </p>
+      )}
+      <div className="mt-3">
+        <Headline data={computeHeadline(phasesByJob.get(job.id) ?? [])} compact />
+      </div>
+      <ul className="mt-3 flex flex-col gap-1.5">
+        {(phasesByJob.get(job.id) ?? []).map((p, i) => (
+          <li key={p.id} className="flex items-center justify-between text-sm">
+            <span className="text-slate-700">
+              <span className="text-slate-400">{i + 1}.</span> {p.label}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
+            >
+              {STATUS_LABEL[p.status]}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 p-4">
-      <RealtimeRefresh channelName="phases-dashboard" />
+      {/* Live updates from crew + salesmen: phases (status), jobs (new/archive),
+          org_members (a salesman renaming themselves). RLS-scoped per user. */}
+      <RealtimeRefresh
+        channelName="dashboard"
+        tables={["phases", "jobs", "org_members"]}
+      />
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <OrgName name={org.name} />
+          {isOwner ? (
+            <OrgName name={org.name} />
+          ) : (
+            <MemberName name={member.name} />
+          )}
           <p className="text-sm text-slate-500">
-            {jobs.length} {showArchived ? "archived" : "active"}{" "}
-            {jobs.length === 1 ? "job" : "jobs"}
+            {ownJobs.length} {showArchived ? "archived" : "active"}{" "}
+            {ownJobs.length === 1 ? "job" : "jobs"}
           </p>
         </div>
         <form action={signOut}>
@@ -126,7 +193,7 @@ export default async function DashboardPage({
       )}
 
       <section className="flex flex-col gap-3">
-        {jobs.length === 0 && (
+        {ownJobs.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
             {showArchived
               ? "No archived jobs."
@@ -134,7 +201,7 @@ export default async function DashboardPage({
           </p>
         )}
 
-        {jobs.map((job) => (
+        {ownJobs.map((job) => (
           <Link
             key={job.id}
             href={`/jobs/${job.id}`}
@@ -148,39 +215,48 @@ export default async function DashboardPage({
                 Open →
               </span>
             </div>
-            {(job.address || job.customer_name) && (
-              <p className="mt-0.5 text-xs text-slate-500">
-                {[job.customer_name, job.address].filter(Boolean).join(" · ")}
-              </p>
-            )}
-
-            <div className="mt-3">
-              <Headline
-                data={computeHeadline(phasesByJob.get(job.id) ?? [])}
-                compact
-              />
-            </div>
-
-            <ul className="mt-3 flex flex-col gap-1.5">
-              {(phasesByJob.get(job.id) ?? []).map((p, i) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span className="text-slate-700">
-                    <span className="text-slate-400">{i + 1}.</span> {p.label}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
-                  >
-                    {STATUS_LABEL[p.status]}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {summary(job)}
           </Link>
         ))}
       </section>
+
+      {/* Read-only roll-up: each salesman's live jobs, one swipeable shelf per
+          person. Glance-only — the owner reads but never edits a salesman's job. */}
+      {isOwner && salesmenGroups.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Team jobs</h2>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+              read-only
+            </span>
+          </div>
+          {salesmenGroups.map(({ member: sm, jobs: smJobs }) => (
+            <div key={sm.id} className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="truncate text-base font-semibold text-slate-900">
+                  {sm.name}
+                </h3>
+                <span className="shrink-0 text-xs text-slate-500">
+                  {smJobs.length} {smJobs.length === 1 ? "job" : "jobs"}
+                </span>
+              </div>
+              <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+                {smJobs.map((job) => (
+                  <article
+                    key={job.id}
+                    className="w-[85%] shrink-0 snap-start rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <h4 className="text-base font-semibold text-slate-900">
+                      {job.name}
+                    </h4>
+                    {summary(job)}
+                  </article>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {!showArchived && (
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
