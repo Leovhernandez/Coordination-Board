@@ -96,8 +96,18 @@ export async function sendSignInLink(email: string): Promise<boolean> {
         html: signInHtml(link),
       }),
     });
+    // Log a delivery failure so a silent fallback to same-browser PKCE is
+    // diagnosable (Vercel logs) instead of just confusing the user.
+    if (!res.ok) {
+      console.error(
+        "[sendSignInLink] Resend rejected:",
+        res.status,
+        await res.text().catch(() => ""),
+      );
+    }
     return res.ok;
-  } catch {
+  } catch (err) {
+    console.error("[sendSignInLink] Resend threw:", err);
     return false;
   }
 }
