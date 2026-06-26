@@ -50,6 +50,7 @@ async function findLinkedMember(
     .select(MEMBER_COLUMNS)
     .eq("user_id", userId)
     .order("role", { ascending: true })
+    .order("created_at", { ascending: true })
     .limit(1);
   return ((data as Member[]) ?? [])[0] ?? null;
 }
@@ -72,6 +73,7 @@ async function claimPendingInvite(
     .select(MEMBER_COLUMNS)
     .is("user_id", null)
     .ilike("email", email)
+    .order("created_at", { ascending: true })
     .limit(1);
   const pending = ((pendingRows as Member[]) ?? [])[0];
   if (!pending) return null;
