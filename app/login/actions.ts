@@ -4,12 +4,19 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSignInAllowed } from "@/lib/access";
+import { sendSignInLink } from "@/lib/invites";
 
 /**
- * Sends a magic-link sign-in email. Access is admin-gated (M14): only approved
- * business owners and invited salesmen may sign in — everyone else is turned
- * away here, before any session exists. A new owner gets their org on first
- * login; an invited salesman is linked to their org.
+ * Sends a sign-in email. Access is admin-gated (M14): only approved business
+ * owners and invited salesmen may sign in — everyone else is turned away here,
+ * before any session exists. A new owner gets their org on first login; an
+ * invited salesman is linked to their org.
+ *
+ * Cross-device by default: we email a token_hash link (lands on /auth/confirm),
+ * which carries its own credential and opens in ANY browser/device — the same
+ * proven path as salesman invites. The old PKCE code flow (/auth/callback) is
+ * kept only as a fallback if email delivery is unavailable; it requires opening
+ * the link in the same browser it was requested from.
  */
 export async function sendMagicLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -27,6 +34,13 @@ export async function sendMagicLink(formData: FormData) {
     );
   }
 
+  // Preferred: cross-device token_hash link via our own email (Resend).
+  if (await sendSignInLink(email)) {
+    redirect("/login?sent=1");
+  }
+
+  // Fallback (email not configured / send failed): Supabase's own magic-link
+  // email via the PKCE code flow — same browser only, but keeps login working.
   const supabase = await createClient();
   const origin =
     (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "";
@@ -35,10 +49,6 @@ export async function sendMagicLink(formData: FormData) {
     email,
     options: {
       shouldCreateUser: true,
-      // Proven code flow: Supabase verifies the link, then redirects here with a
-      // ?code= that /auth/callback exchanges for a session. This is the flow that
-      // ran the whole pilot. (Cross-device token_hash sign-in is being rebuilt
-      // separately on a preview deploy before it touches production again.)
       emailRedirectTo: `${origin}/auth/callback`,
     },
   });

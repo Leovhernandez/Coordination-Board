@@ -68,6 +68,67 @@ export async function sendSalesmanInvite(
   }
 }
 
+/**
+ * Email ANY authorized account (owner or salesman) a one-tap sign-in link from
+ * the login form. Uses the same cross-device token_hash link as invites, so the
+ * link opens in any browser/device — not just the one that requested it (unlike
+ * the PKCE code flow). Best-effort: returns false if email isn't configured or
+ * sending failed, so the caller can fall back to the PKCE flow.
+ */
+export async function sendSignInLink(email: string): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || !SITE) return false;
+
+  const link = await signInLinkFor(email);
+  if (!link) return false;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM,
+        to: [email],
+        subject: "Your sign-in link for Coordination Board",
+        html: signInHtml(link),
+      }),
+    });
+    // Log a delivery failure so a silent fallback to same-browser PKCE is
+    // diagnosable (Vercel logs) instead of just confusing the user.
+    if (!res.ok) {
+      console.error(
+        "[sendSignInLink] Resend rejected:",
+        res.status,
+        await res.text().catch(() => ""),
+      );
+    }
+    return res.ok;
+  } catch (err) {
+    console.error("[sendSignInLink] Resend threw:", err);
+    return false;
+  }
+}
+
+function signInHtml(link: string): string {
+  return `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
+    <h2 style="margin:0 0 8px;font-size:20px">Sign in to Coordination Board</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:15px">
+      Tap below to sign in. No password — and it works on any device or browser,
+      even if that's different from where you requested this link.
+    </p>
+    <a href="${link}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;font-size:15px">
+      Sign in to Coordination Board
+    </a>
+    <p style="margin:20px 0 0;color:#94a3b8;font-size:12px">
+      If you didn't request this, you can ignore this email.
+    </p>
+  </div>`;
+}
+
 function inviteHtml(orgName: string, link: string): string {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
