@@ -5,14 +5,17 @@ import { isAdminEmail } from "@/lib/admin";
 /**
  * Access control for the multi-seat model (M14).
  *
- * BUSINESS OWNER = an email the admin has approved (the allowlist), or the admin
- * itself, or an email that already owns an org (existing owners aren't locked
- * out). Only business owners get an org + the Team screen. This is what stops an
- * owner from spinning up a second, free business — only the admin grants owner
- * status.
+ * BUSINESS OWNER = the admin, or an email the admin has approved (the Owner List
+ * / allowed_emails). That is the SOLE source of truth — only the admin grants
+ * owner status. We deliberately do NOT grandfather "an org already exists with
+ * this owner_email", because that let a removed/stale account keep owner powers
+ * forever (Team, Billing, inviting salesmen) regardless of the Owner List. Owner
+ * status is therefore live: add/remove an email in the admin Owner List and it
+ * takes effect on that user's next page load.
  *
- * A SALESMAN is invited by a business owner (an org_members row) and may sign in
- * on the strength of that invite alone — they never get owner powers.
+ * Only business owners get an org + the Team/Billing screens. A SALESMAN is
+ * invited by a business owner (an org_members row) and may sign in on the
+ * strength of that invite alone — they never get owner powers.
  */
 export async function isBusinessOwnerEmail(email: string): Promise<boolean> {
   if (isAdminEmail(email)) return true;
@@ -25,15 +28,7 @@ export async function isBusinessOwnerEmail(email: string): Promise<boolean> {
     .select("email")
     .eq("email", e)
     .maybeSingle();
-  if (allowed) return true;
-
-  // Existing owner (signed up before owner-gating) — don't lock them out.
-  const { data: org } = await svc
-    .from("organizations")
-    .select("id")
-    .ilike("owner_email", e)
-    .maybeSingle();
-  return !!org;
+  return !!allowed;
 }
 
 /**
@@ -45,10 +40,14 @@ export async function isSignInAllowed(email: string): Promise<boolean> {
   if (await isBusinessOwnerEmail(email)) return true;
 
   const svc = createServiceClient();
-  const { data: invite } = await svc
+  // NOTE: an email can have MULTIPLE org_members rows (invited to >1 org, or a
+  // legacy self-org plus an invite), so we must not use .maybeSingle() here —
+  // it errors on >1 row and would wrongly deny a real invitee. limit(1) just
+  // asks "does at least one invite exist?".
+  const { data: invites } = await svc
     .from("org_members")
     .select("id")
     .ilike("email", email.trim().toLowerCase())
-    .maybeSingle();
-  return !!invite;
+    .limit(1);
+  return !!invites && invites.length > 0;
 }

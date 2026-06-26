@@ -41,12 +41,18 @@ async function findLinkedMember(
   svc: Svc,
   userId: string,
 ): Promise<Member | null> {
+  // A user could be linked to >1 org_members row (e.g. claimed an invite while
+  // also holding a legacy self-org owner row), so don't use .maybeSingle() —
+  // it errors on multiple rows. Owner rows first so a legacy owner row is the
+  // stable pick; isOwner is still decided later by the live Owner List, not role.
   const { data } = await svc
     .from("org_members")
     .select(MEMBER_COLUMNS)
     .eq("user_id", userId)
-    .maybeSingle();
-  return (data as Member) ?? null;
+    .order("role", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(1);
+  return ((data as Member[]) ?? [])[0] ?? null;
 }
 
 /**
@@ -59,23 +65,33 @@ async function claimPendingInvite(
   userId: string,
   email: string,
 ): Promise<Member | null> {
-  const { data: pending } = await svc
+  // An email may have pending invites in several orgs; claim the first (don't
+  // use .maybeSingle(), which errors on >1 row). One person = one active org
+  // membership in this model, so a single claim is correct.
+  const { data: pendingRows } = await svc
     .from("org_members")
     .select(MEMBER_COLUMNS)
     .is("user_id", null)
     .ilike("email", email)
-    .maybeSingle();
+    .order("created_at", { ascending: true })
+    .limit(1);
+  const pending = ((pendingRows as Member[]) ?? [])[0];
   if (!pending) return null;
   const { data: claimed } = await svc
     .from("org_members")
     .update({ user_id: userId })
-    .eq("id", (pending as Member).id)
+    .eq("id", pending.id)
     .select(MEMBER_COLUMNS)
     .single();
-  return (claimed as Member) ?? (pending as Member);
+  return (claimed as Member) ?? pending;
 }
 
-/** Build the session context from a resolved membership + its org. */
+/**
+ * Build the session context for a NON-owner membership (salesman, or a legacy
+ * self-org account that is no longer an approved owner). Owners are resolved
+ * earlier in getSessionContext from the live Owner List, so isOwner is always
+ * false here — the stored member.role is never trusted to grant owner powers.
+ */
 async function contextFor(
   svc: Svc,
   userId: string,
@@ -93,7 +109,7 @@ async function contextFor(
     email,
     org: org as Organization,
     member,
-    isOwner: member.role === "owner",
+    isOwner: false,
   };
 }
 
@@ -128,11 +144,16 @@ async function ensureOwnerMember(
 
 /**
  * The signed-in user's org + membership, resolved in priority order:
- *  1. already a member (existing owner or linked salesman) → their org
- *  2. admin-approved business owner (or existing org owner) → owner of their org
- *     (this OUTRANKS any salesman invite, so an owner can't be captured)
- *  3. invited salesman, first sign-in → claim the invite, salesman of that org
- *  4. otherwise (signed in but neither approved nor invited) → null (no access)
+ *  1. business owner (admin OR on the admin Owner List) → owner of their OWN org.
+ *     Checked FIRST and computed live from the Owner List, so it OUTRANKS any
+ *     salesman membership (an approved owner is never captured into another org)
+ *     and reflects Owner-List add/remove on the next page load. The ONLY path
+ *     that sets isOwner = true.
+ *  2. already a member (a salesman linked on a prior sign-in, or a legacy
+ *     self-org account that is no longer an approved owner) → their org, as a
+ *     non-owner. The stored role is not trusted to grant owner powers.
+ *  3. invited salesman, first sign-in → claim the invite, salesman of that org.
+ *  4. otherwise (signed in but neither approved nor invited) → null (no access).
  * Returns null if not signed in OR if the user has no access.
  */
 export async function getSessionContext(): Promise<SessionContext | null> {
@@ -145,19 +166,18 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   const svc = createServiceClient();
   const email = user.email ?? null;
 
-  // 1. Already a member.
-  const linked = await findLinkedMember(svc, user.id);
-  if (linked) return contextFor(svc, user.id, email, linked);
-
-  // 2. Owner precedence: only the admin grants owner status (the allowlist), so
-  //    owners can't mint a second free business and can't be pulled into another
-  //    org as a salesman.
+  // 1. Owner precedence (live, admin-granted only). This is the sole source of
+  //    owner status — see lib/access.ts isBusinessOwnerEmail.
   if (email && (await isBusinessOwnerEmail(email))) {
     const org = await getOrCreateOrg();
     if (!org) return null;
     const member = await ensureOwnerMember(svc, org, user.id, email);
     return { userId: user.id, email, org, member, isOwner: true };
   }
+
+  // 2. Already a member, but NOT an approved owner → non-owner context.
+  const linked = await findLinkedMember(svc, user.id);
+  if (linked) return contextFor(svc, user.id, email, linked);
 
   // 3. Invited salesman → claim on first sign-in.
   if (email) {

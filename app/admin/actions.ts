@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendSalesmanInvite } from "@/lib/invites";
+import { isBusinessOwnerEmail } from "@/lib/access";
 
 async function guard() {
   await requireAdmin();
@@ -71,10 +72,18 @@ export async function addSalesmanToOrg(orgId: string, formData: FormData) {
 
   const { data: org } = await svc
     .from("organizations")
-    .select("name, salesman_seat_limit")
+    .select("name, salesman_seat_limit, owner_email")
     .eq("id", orgId)
     .maybeSingle();
   if (!org) return;
+
+  // Only an approved business owner's org can have salesmen. Mirrors the live
+  // owner gate, so a forged request against a salesman/legacy account is refused
+  // even though the UI already hides the form for it.
+  if (!org.owner_email || !(await isBusinessOwnerEmail(org.owner_email))) {
+    revalidatePath("/admin");
+    return;
+  }
 
   const { data: existing } = await svc
     .from("org_members")
