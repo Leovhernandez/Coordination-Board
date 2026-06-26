@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin, isAdminEmail } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   addAllowedEmail,
@@ -38,6 +38,14 @@ export default async function AdminPage() {
     .select("email")
     .order("email");
   const allowed = allowedData ?? [];
+
+  // An account may invite salesmen only if it's an approved business owner — the
+  // admin, or an email on the Owner List below. This mirrors the live owner gate
+  // (lib/access.ts), so a salesman/legacy account in the list shows no
+  // add-salesman form, and adding an email to the Owner List grants it on refresh.
+  const ownerEmails = new Set(allowed.map((a) => a.email.toLowerCase()));
+  const isOwnerAccount = (email: string | null) =>
+    !!email && (isAdminEmail(email) || ownerEmails.has(email.toLowerCase()));
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-6 p-4">
@@ -95,25 +103,27 @@ export default async function AdminPage() {
                   </ConfirmSubmit>
                 </form>
               </div>
-              <form
-                action={addSalesmanToOrg.bind(null, o.id)}
-                className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2"
-              >
-                <input
-                  name="name"
-                  placeholder="Salesman name"
-                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
-                />
-                <input
-                  name="email"
-                  type="email"
-                  placeholder="salesman@email.com"
-                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
-                />
-                <button className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white">
-                  Add salesman
-                </button>
-              </form>
+              {isOwnerAccount(o.owner_email) && (
+                <form
+                  action={addSalesmanToOrg.bind(null, o.id)}
+                  className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2"
+                >
+                  <input
+                    name="name"
+                    placeholder="Salesman name"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
+                  />
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="salesman@email.com"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
+                  />
+                  <button className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white">
+                    Add salesman
+                  </button>
+                </form>
+              )}
             </div>
           );
         })}
