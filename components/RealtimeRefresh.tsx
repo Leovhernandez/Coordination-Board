@@ -10,11 +10,17 @@ import { createClient } from "@/lib/supabase/client";
  * (and the critical-path headline + the owner's roll-up) update live without a
  * manual refresh.
  *
+ * One channel PER table (not one shared channel with several bindings): if a
+ * bound table isn't in the supabase_realtime publication, Realtime errors that
+ * table's channel — and a SHARED channel would take the healthy bindings down
+ * with it, silently killing live refresh for the whole page (this is exactly
+ * what an unpublished `org_members` did to the dashboard's phases+jobs). Isolated
+ * channels contain the failure to the offending table.
+ *
  * RLS-scoped: the authenticated user only receives events for rows they can
  * SELECT, so a participant's edit (written via service-role) is delivered to the
- * owner here. Each table must be in the supabase_realtime publication. `filter`
- * (e.g. job_id=eq.X) applies to every listed table, so only pass it when every
- * table shares that column (the single-table `phases` job board does).
+ * owner here. `filter` (e.g. job_id=eq.X) applies to every listed table, so only
+ * pass it when every table shares that column (the single-table `phases` board).
  */
 export function RealtimeRefresh({
   channelName,
@@ -31,9 +37,8 @@ export function RealtimeRefresh({
 
   useEffect(() => {
     const supabase = createClient();
-    let channel = supabase.channel(channelName);
-    for (const table of tablesKey.split(",")) {
-      channel = channel.on(
+    const channels = tablesKey.split(",").map((table) => {
+      const channel = supabase.channel(`${channelName}-${table}`).on(
         "postgres_changes",
         {
           event: "*",
@@ -43,11 +48,21 @@ export function RealtimeRefresh({
         },
         () => router.refresh(),
       );
-    }
-    channel.subscribe();
+      channel.subscribe((status, err) => {
+        // Surface a dead subscription (e.g. table not in the publication) so a
+        // silent live-refresh failure is diagnosable instead of invisible.
+        if (
+          process.env.NODE_ENV === "development" &&
+          (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
+        ) {
+          console.warn(`RealtimeRefresh ${channelName}-${table}: ${status}`, err);
+        }
+      });
+      return channel;
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      for (const channel of channels) supabase.removeChannel(channel);
     };
   }, [channelName, filter, tablesKey, router]);
 
