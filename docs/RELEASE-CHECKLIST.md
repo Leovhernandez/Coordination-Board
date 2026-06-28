@@ -66,7 +66,9 @@ bugs surface without persisting anything.
 Run on the preview URL, signed in as a real owner. Per the standing rule, verify the
 whole app, not just the new change:
 
-- [ ] **Sign in**: magic link → lands on **dashboard** (no bounce to /login)
+- [ ] **Sign in** (FIX-2): magic link → **"Sign in" interstitial → dashboard** (no
+      bounce); survives an **Outlook/Safe-Links prefetch**, works **cross-device /
+      opened in a different browser**, and the **salesman-invite** link still works
 - [ ] **Create job** (name/address/customer) → default phases appear
 - [ ] **Board statuses**: set Done / In progress / Blocked(+reason) → persists
 - [ ] **Critical-path headline** is correct and leads the dashboard
@@ -74,7 +76,9 @@ whole app, not just the new change:
 - [ ] **Crew**: add participant → copy/text link → revoke
 - [ ] **Participant board**: texted link opens with **no signup**, shows **only
       assigned** phases, can update status; owner's board updates **live**
-- [ ] **Live updates**: owner Realtime + participant Broadcast
+- [ ] **Live updates** (FIX-1): **owner AND salesman** dashboards refresh on a
+      crew/salesman change (per-table channels); participant board via Broadcast;
+      owner sees salesmen's jobs update live in the roll-up
 - [ ] **Archive / unarchive**; **org name** + **job name** inline edit
 - [ ] **Access gating**: trial / expired states behave
 - [ ] **Admin** panel + **company oversight** read-only view (if touched)

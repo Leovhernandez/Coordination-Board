@@ -43,10 +43,28 @@ as a working, deployed, live URL. Keep PRs/commits scoped to one milestone.
 
 ## §6 — Working style
 Mobile-first always (contractor, one hand, bad signal). Pause at each milestone's
-"Done when" for real-device validation. **Regression-test every change against ALL
-prior features, not in isolation.** Never commit, push, or deploy without explicit
-go-ahead. The autonomous loop pauses before starting a new milestone and whenever
-manual action is required from the owner.
+"Done when" for real-device validation. Never commit, push, or deploy without
+explicit go-ahead. The autonomous loop pauses before starting a new milestone and
+whenever manual action is required from the owner.
+
+**Regression is a hard gate, not a courtesy (binding).** No addition or fix ships
+until it has been re-verified against **ALL** previously-working features — never
+in isolation — per `docs/RELEASE-CHECKLIST.md` Step 4. An update that breaks a
+working feature is a failed change, full stop; revert or fix before proceeding.
+The subsystems that regress **silently** must be re-checked on **every** change:
+- **Realtime live-refresh** (FIX-1 — one channel per table; verify owner *and*
+  salesman dashboards + the participant board still refresh; a table missing from
+  the `supabase_realtime` publication must not kill the others).
+- **Sign-in** (FIX-2 — the GET interstitial → POST `verifyOtp`; verify it survives
+  an Outlook/Safe-Links prefetch, works **cross-device / different browser**, and
+  the salesman-invite link + PKCE fallback still work).
+- **RLS read-vs-write + tenant isolation** (a member reads what they should, writes
+  only what they own, and never sees another org's data or another salesman's crew
+  tokens).
+- **Critical-path headline** (§2 — the centerpiece must still compute correctly).
+
+Schema/RLS and auth changes additionally require the **RLS pre-flight**
+(RELEASE-CHECKLIST Step 2) to pass before they reach `main`.
 
 ## §7 — Anti-scope
 
