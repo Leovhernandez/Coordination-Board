@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { participantLink } from "@/lib/participant";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
+import { getDictionary } from "@/lib/i18n/server";
 import { Board } from "./Board";
 import { Crew } from "./Crew";
 import { JobName } from "./JobName";
@@ -21,6 +22,7 @@ export default async function JobBoardPage({
   const { id } = await params;
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login");
+  const t = await getDictionary();
 
   const supabase = await createClient();
   // RLS (post-M-VIS): any org member can READ any org job; a job in another org
@@ -87,7 +89,7 @@ export default async function JobBoardPage({
             href="/dashboard"
             className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600 shadow-sm active:bg-slate-100"
           >
-            ← Jobs
+            {t.job.back}
           </Link>
           {canEdit && (
             <form
@@ -98,7 +100,7 @@ export default async function JobBoardPage({
               }
             >
               <button className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-500 shadow-sm active:bg-slate-100">
-                {job.status === "archived" ? "Unarchive" : "Archive"}
+                {job.status === "archived" ? t.job.unarchive : t.job.archive}
               </button>
             </form>
           )}
@@ -113,12 +115,12 @@ export default async function JobBoardPage({
           )}
           {job.status === "archived" && (
             <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-              Archived
+              {t.common.archived}
             </span>
           )}
           {!canEdit && (
             <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-              View only
+              {t.common.viewOnly}
             </span>
           )}
         </div>

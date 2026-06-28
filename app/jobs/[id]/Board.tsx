@@ -2,14 +2,11 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import type { Phase, PhaseStatus } from "@/lib/types";
-import {
-  STATUS_ACCENT,
-  STATUS_ACTIVE,
-  STATUS_LABEL,
-  STATUS_PILL,
-} from "@/lib/status";
+import { STATUS_ACCENT, STATUS_ACTIVE, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
+import { useT } from "@/components/I18nProvider";
+import { interpolate } from "@/lib/i18n/interpolate";
 import {
   addPhase,
   assignPhase,
@@ -27,11 +24,8 @@ type OptimisticUpdate = {
   blocked_reason: string | null;
 };
 
-const CONTROLS: { status: PhaseStatus; label: string }[] = [
-  { status: "in_progress", label: "In progress" },
-  { status: "blocked", label: "Blocked" },
-  { status: "done", label: "Done" },
-];
+// Status controls (labels come from the dictionary via t.status[...]).
+const CONTROLS: PhaseStatus[] = ["in_progress", "blocked", "done"];
 
 export function Board({
   jobId,
@@ -47,6 +41,7 @@ export function Board({
    *  SAME component renders both so they can't drift. */
   readOnly?: boolean;
 }) {
+  const t = useT();
   const nameOf = new Map(participants.map((p) => [p.id, p.name]));
   const [, startTransition] = useTransition();
   const [optimisticPhases, applyOptimistic] = useOptimistic(
@@ -97,7 +92,7 @@ export function Board({
   }
 
   function onDelete(p: Phase) {
-    if (!confirm(`Delete phase "${p.label}"?`)) return;
+    if (!confirm(interpolate(t.board.deleteConfirm, { label: p.label }))) return;
     startTransition(() => deletePhase(p.id, jobId));
   }
 
@@ -127,7 +122,7 @@ export function Board({
                 : "border-slate-200 bg-white text-slate-600 shadow-sm active:bg-slate-100"
             }`}
           >
-            {editMode ? "Done editing" : "Edit phases"}
+            {editMode ? t.board.doneEditing : t.board.edit}
           </button>
         </div>
       )}
@@ -147,17 +142,17 @@ export function Board({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                   }}
-                  aria-label="Phase name"
+                  aria-label={t.board.phaseNameAria}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                 />
                 {participants.length > 0 ? (
                   <select
                     value={p.assignee_participant_id ?? ""}
                     onChange={(e) => onAssign(p, e.target.value || null)}
-                    aria-label="Assign to"
+                    aria-label={t.board.assignToAria}
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base outline-none focus:border-slate-900"
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">{t.board.unassigned}</option>
                     {participants.map((pt) => (
                       <option key={pt.id} value={pt.id}>
                         {pt.name}
@@ -165,35 +160,33 @@ export function Board({
                     ))}
                   </select>
                 ) : (
-                  <p className="text-xs text-slate-400">
-                    Add crew below, then assign them here.
-                  </p>
+                  <p className="text-xs text-slate-400">{t.board.addCrewHint}</p>
                 )}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => onMove(p, -1)}
                     disabled={i === 0}
-                    aria-label="Move up"
+                    aria-label={t.board.moveUpAria}
                     className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 active:bg-slate-100 disabled:opacity-30"
                   >
-                    ↑ Up
+                    {t.board.up}
                   </button>
                   <button
                     type="button"
                     onClick={() => onMove(p, 1)}
                     disabled={i === optimisticPhases.length - 1}
-                    aria-label="Move down"
+                    aria-label={t.board.moveDownAria}
                     className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 active:bg-slate-100 disabled:opacity-30"
                   >
-                    ↓ Down
+                    {t.board.down}
                   </button>
                   <button
                     type="button"
                     onClick={() => onDelete(p)}
                     className="flex-1 rounded-lg border border-red-200 py-2.5 text-sm font-semibold text-red-600 active:bg-red-50"
                   >
-                    Delete
+                    {t.board.delete}
                   </button>
                 </div>
               </div>
@@ -214,27 +207,27 @@ export function Board({
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
                   >
-                    {STATUS_LABEL[p.status]}
+                    {t.status[p.status]}
                   </span>
                 </div>
 
                 {!readOnly && (
                   <div className="flex gap-2">
                     {CONTROLS.map((c) => {
-                      const isActive = p.status === c.status;
+                      const isActive = p.status === c;
                       return (
                         <button
-                          key={c.status}
+                          key={c}
                           type="button"
-                          onClick={() => onTapStatus(p, c.status)}
+                          onClick={() => onTapStatus(p, c)}
                           aria-pressed={isActive}
                           className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold transition-colors ${
                             isActive
-                              ? STATUS_ACTIVE[c.status]
+                              ? STATUS_ACTIVE[c]
                               : "border-slate-200 bg-white text-slate-600 active:bg-slate-100"
                           }`}
                         >
-                          {c.label}
+                          {t.status[c]}
                         </button>
                       );
                     })}
@@ -246,7 +239,7 @@ export function Board({
                     <input
                       value={reasonDraft}
                       onChange={(e) => setReasonDraft(e.target.value)}
-                      placeholder="Waiting on…"
+                      placeholder={t.board.waitingOnPlaceholder}
                       autoFocus
                       enterKeyHint="done"
                       onKeyDown={(e) => {
@@ -260,14 +253,16 @@ export function Board({
                       disabled={!reasonDraft.trim()}
                       className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
                     >
-                      Save
+                      {t.board.save}
                     </button>
                   </div>
                 ) : (
                   p.status === "blocked" &&
                   p.blocked_reason && (
                     <p className="mt-2.5 text-sm font-medium text-red-700">
-                      ⛔ Waiting on {p.blocked_reason}
+                      {interpolate(t.board.waitingOn, {
+                        reason: p.blocked_reason,
+                      })}
                     </p>
                   )
                 )}
@@ -282,7 +277,7 @@ export function Board({
           <input
             value={addDraft}
             onChange={(e) => setAddDraft(e.target.value)}
-            placeholder="Add a phase…"
+            placeholder={t.board.addPhasePlaceholder}
             enterKeyHint="done"
             onKeyDown={(e) => {
               if (e.key === "Enter") onAdd();
@@ -295,7 +290,7 @@ export function Board({
             disabled={!addDraft.trim()}
             className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
           >
-            Add
+            {t.board.add}
           </button>
         </div>
       )}

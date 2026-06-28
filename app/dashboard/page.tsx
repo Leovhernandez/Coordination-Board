@@ -3,10 +3,13 @@ import { redirect } from "next/navigation";
 import { getSessionContext, listMembers, type Member } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
-import { STATUS_LABEL, STATUS_PILL } from "@/lib/status";
+import { STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
+import { LangToggle } from "@/components/LangToggle";
+import { getDictionary } from "@/lib/i18n/server";
+import { interpolate } from "@/lib/i18n/interpolate";
 import { isAccessAllowed } from "@/lib/stripe";
 import { isAdminEmail } from "@/lib/admin";
 import { OrgName } from "./OrgName";
@@ -24,6 +27,7 @@ export default async function DashboardPage({
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login");
   const { org, isOwner, email, member } = ctx;
+  const t = await getDictionary();
 
   const showArchived = (await searchParams).view === "archived";
 
@@ -95,7 +99,7 @@ export default async function DashboardPage({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-base font-semibold text-slate-900">{job.name}</h3>
         <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-500">
-          Open →
+          {t.dashboard.open}
         </span>
       </div>
       {(job.address || job.customer_name) && (
@@ -115,7 +119,7 @@ export default async function DashboardPage({
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
             >
-              {STATUS_LABEL[p.status]}
+              {t.status[p.status]}
             </span>
           </li>
         ))}
@@ -153,15 +157,26 @@ export default async function DashboardPage({
             <MemberName name={member.name} />
           )}
           <p className="text-sm text-slate-500">
-            {myJobs.length} {showArchived ? "archived" : "active"}{" "}
-            {myJobs.length === 1 ? "job" : "jobs"}
+            {interpolate(
+              showArchived
+                ? myJobs.length === 1
+                  ? t.dashboard.archivedOne
+                  : t.dashboard.archivedMany
+                : myJobs.length === 1
+                  ? t.dashboard.activeOne
+                  : t.dashboard.activeMany,
+              { n: myJobs.length },
+            )}
           </p>
         </div>
-        <form action={signOut}>
-          <button className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 active:bg-slate-100">
-            Sign out
-          </button>
-        </form>
+        <div className="flex shrink-0 items-center gap-2">
+          <LangToggle />
+          <form action={signOut}>
+            <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 active:bg-slate-100">
+              {t.common.signOut}
+            </button>
+          </form>
+        </div>
       </header>
 
       <div className="flex items-center gap-2">
@@ -171,7 +186,7 @@ export default async function DashboardPage({
             showArchived ? "text-slate-500" : "bg-slate-900 text-white"
           }`}
         >
-          Active
+          {t.nav.active}
         </Link>
         <Link
           href="/dashboard?view=archived"
@@ -179,14 +194,14 @@ export default async function DashboardPage({
             showArchived ? "bg-slate-900 text-white" : "text-slate-500"
           }`}
         >
-          Archived
+          {t.nav.archived}
         </Link>
         {isOwner && (
           <Link
             href="/dashboard/team"
             className="ml-auto rounded-full px-3 py-1 text-sm font-medium text-slate-500"
           >
-            Team
+            {t.nav.team}
           </Link>
         )}
         {isOwner && (
@@ -194,7 +209,7 @@ export default async function DashboardPage({
             href="/billing"
             className="rounded-full px-3 py-1 text-sm font-medium text-slate-500"
           >
-            Billing
+            {t.nav.billing}
           </Link>
         )}
         {admin && (
@@ -202,7 +217,7 @@ export default async function DashboardPage({
             href="/admin"
             className="rounded-full px-3 py-1 text-sm font-medium text-slate-500"
           >
-            Admin
+            {t.nav.admin}
           </Link>
         )}
       </div>
@@ -212,19 +227,27 @@ export default async function DashboardPage({
           href="/billing"
           className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900"
         >
-          Your {org.subscription_status === "trialing" ? "trial has ended" : `subscription is ${org.subscription_status}`}{" "}
-          — subscribe to create jobs →
+          {org.subscription_status === "trialing"
+            ? t.dashboard.trialEnded
+            : interpolate(t.dashboard.subInactive, {
+                status:
+                  t.subStatus[
+                    org.subscription_status as keyof typeof t.subStatus
+                  ] ?? org.subscription_status,
+              })}
         </Link>
       )}
 
       {/* My jobs — editable, horizontal shelf with full phase detail. */}
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">My jobs</h2>
+        <h2 className="text-sm font-semibold text-slate-900">
+          {t.dashboard.myJobs}
+        </h2>
         {myJobs.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
             {showArchived
-              ? "No archived jobs of yours."
-              : "No jobs yet. Create your first one below — it starts with the standard phases."}
+              ? t.dashboard.emptyOwnArchived
+              : t.dashboard.emptyOwnActive}
           </p>
         ) : (
           <div className={shelf}>{myJobs.map(fullCard)}</div>
@@ -234,29 +257,31 @@ export default async function DashboardPage({
       {/* New job — directly under My jobs (not pushed to the page bottom). */}
       {!showArchived && (
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">New job</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">
+            {t.dashboard.newJob}
+          </h2>
           <form action={createJob} className="flex flex-col gap-2.5">
             <input
               name="name"
               required
-              placeholder="Job name (e.g. 1428 Oak St kitchen)"
+              placeholder={t.dashboard.jobNamePlaceholder}
               className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />
             <input
               name="address"
-              placeholder="Address (optional)"
+              placeholder={t.dashboard.addressPlaceholder}
               className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />
             <input
               name="customer_name"
-              placeholder="Customer name (optional)"
+              placeholder={t.dashboard.customerPlaceholder}
               className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />
             <button
               type="submit"
               className="rounded-lg bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-700"
             >
-              Create job
+              {t.dashboard.createJob}
             </button>
           </form>
         </section>
@@ -266,9 +291,11 @@ export default async function DashboardPage({
       {teamGroups.length > 0 && (
         <section className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Team jobs</h2>
+            <h2 className="text-sm font-semibold text-slate-900">
+              {t.dashboard.teamJobs}
+            </h2>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-              read-only
+              {t.common.readOnly}
             </span>
           </div>
           {teamGroups.map(({ member: tm, jobs: tj }) => (
@@ -278,7 +305,12 @@ export default async function DashboardPage({
                   {tm.name}
                 </h3>
                 <span className="shrink-0 text-xs text-slate-500">
-                  {tj.length} {tj.length === 1 ? "job" : "jobs"}
+                  {interpolate(
+                    tj.length === 1
+                      ? t.dashboard.jobCountOne
+                      : t.dashboard.jobCountMany,
+                    { n: tj.length },
+                  )}
                 </span>
               </div>
               <div className={shelf}>{tj.map(compactCard)}</div>

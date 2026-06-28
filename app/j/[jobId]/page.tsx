@@ -6,6 +6,7 @@ import {
   participantCookieName,
 } from "@/lib/participant";
 import { BroadcastRefresh } from "@/components/BroadcastRefresh";
+import { getDictionary } from "@/lib/i18n/server";
 import { ParticipantBoard } from "./ParticipantBoard";
 import type { Phase } from "@/lib/types";
 
@@ -29,17 +30,15 @@ export default async function ParticipantPage({
 
   const token = (await cookies()).get(participantCookieName(jobId))?.value;
   const participant = await getParticipantByToken(jobId, token);
+  const t = await getDictionary();
 
   if (!participant) {
     return (
       <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-3 p-6 text-center">
         <h1 className="text-xl font-semibold text-slate-900">
-          This link isn’t active
+          {t.participant.linkInactive}
         </h1>
-        <p className="text-sm text-slate-500">
-          It may have been revoked or it’s incorrect. Ask the contractor to text
-          you a fresh link.
-        </p>
+        <p className="text-sm text-slate-500">{t.participant.linkInactiveHint}</p>
       </main>
     );
   }
@@ -65,7 +64,7 @@ export default async function ParticipantPage({
       <ParticipantBoard
         key={myPhases.map((p) => p.id).join(",") || "none"}
         jobId={jobId}
-        jobName={job?.name ?? "Job"}
+        jobName={job?.name ?? t.participant.jobFallback}
         participantName={participant.name}
         phases={myPhases}
       />

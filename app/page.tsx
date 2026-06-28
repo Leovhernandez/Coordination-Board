@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getDictionary } from "@/lib/i18n/server";
 
 const PREVIEW: { label: string; dot: string }[] = [
   { label: "Demo", dot: "bg-emerald-500" },
@@ -7,20 +8,15 @@ const PREVIEW: { label: string; dot: string }[] = [
   { label: "Finish", dot: "bg-slate-300" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const t = await getDictionary();
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-7 p-6">
       <div className="flex flex-col gap-3">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           Coordination Board
         </h1>
-        <p className="text-base text-slate-600">
-          One shared status board per job. Each trade taps{" "}
-          <span className="font-medium text-slate-900">Done</span>,{" "}
-          <span className="font-medium text-slate-900">In&nbsp;progress</span>,
-          or <span className="font-medium text-slate-900">Blocked</span> — and
-          the owner sees the one thing blocking the next phase.
-        </p>
+        <p className="text-base text-slate-600">{t.landing.tagline}</p>
       </div>
 
       <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -36,14 +32,14 @@ export default function Home() {
         href="/login"
         className="rounded-lg bg-slate-900 px-4 py-3 text-center text-base font-semibold text-white active:bg-slate-700"
       >
-        Owner sign in
+        {t.auth.ownerSignIn}
       </Link>
 
       <Link
         href="/health"
         className="text-center text-sm font-medium text-slate-400 hover:text-slate-600"
       >
-        Health check
+        {t.landing.healthCheck}
       </Link>
     </main>
   );

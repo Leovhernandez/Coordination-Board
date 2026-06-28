@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { renameOrg } from "./actions";
+import { useT } from "@/components/I18nProvider";
 
 /** Tap the name to rename your company/yourself — inline, no settings screen. */
 export function OrgName({ name }: { name: string }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [, startTransition] = useTransition();
@@ -29,7 +31,7 @@ export function OrgName({ name }: { name: string }) {
             setEditing(false);
           }
         }}
-        aria-label="Your name or company"
+        aria-label={t.misc.companyNameAria}
         className="w-full rounded-lg border border-slate-300 px-2 py-1 text-2xl font-bold tracking-tight text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
       />
     );

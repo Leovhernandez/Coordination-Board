@@ -1,5 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { getLang } from "@/lib/i18n/server";
+import { dictionaries } from "@/lib/i18n/dictionaries";
 
 /**
  * Magic-link landing — PKCE code flow (the FALLBACK sign-in path, used only when
@@ -28,14 +30,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
+  const t = dictionaries[await getLang()].authConfirm;
 
   if (!code) {
     return NextResponse.redirect(
-      new URL(
-        "/login?error=" +
-          encodeURIComponent("Sign-in link was missing or invalid."),
-        request.url,
-      ),
+      new URL("/login?error=" + encodeURIComponent(t.missing), request.url),
     );
   }
 
@@ -63,10 +62,10 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (!error) return response;
 
-  const msg =
-    "Couldn't complete sign-in — open the link in the same browser you " +
-    `requested it from. (${error.message})`;
   return NextResponse.redirect(
-    new URL("/login?error=" + encodeURIComponent(msg), request.url),
+    new URL(
+      "/login?error=" + encodeURIComponent(`${t.sameBrowser} (${error.message})`),
+      request.url,
+    ),
   );
 }

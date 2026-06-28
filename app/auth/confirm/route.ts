@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
+import { getLang } from "@/lib/i18n/server";
+import { dictionaries } from "@/lib/i18n/dictionaries";
 
 /**
  * token_hash / PKCE-code sign-in landing. Used by salesman invite emails and
@@ -54,17 +56,19 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") ?? "";
   const code = searchParams.get("code") ?? "";
   const next = safeNext(searchParams.get("next"));
+  const lang = await getLang();
+  const t = dictionaries[lang].authConfirm;
 
   if (!token_hash && !code) {
-    return fail(request, "Sign-in link was missing or invalid.");
+    return fail(request, t.missing);
   }
 
   const html = `<!DOCTYPE html>
-<html lang="en"><head>
+<html lang="${lang}"><head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>Finish signing in</title>
+<title>${esc(t.title)}</title>
 <style>
   :root{color-scheme:light}
   *{box-sizing:border-box}
@@ -78,14 +82,14 @@ export async function GET(request: NextRequest) {
   button:active{background:#1e293b}
 </style></head>
 <body><main>
-  <h1>Almost there</h1>
-  <p>Tap below to finish signing in to Coordination Board.</p>
+  <h1>${esc(t.heading)}</h1>
+  <p>${esc(t.body)}</p>
   <form method="POST" action="/auth/confirm">
     <input type="hidden" name="token_hash" value="${esc(token_hash)}" />
     <input type="hidden" name="type" value="${esc(type)}" />
     <input type="hidden" name="code" value="${esc(code)}" />
     <input type="hidden" name="next" value="${esc(next)}" />
-    <button type="submit">Sign in</button>
+    <button type="submit">${esc(t.button)}</button>
   </form>
 </main></body></html>`;
 
@@ -101,6 +105,7 @@ export async function POST(request: NextRequest) {
   const urlType = (String(form.get("type") ?? "") || null) as EmailOtpType | null;
   const code = String(form.get("code") ?? "");
   const next = safeNext(String(form.get("next") ?? ""));
+  const t = dictionaries[await getLang()].authConfirm;
 
   // 303 so the browser follows the redirect as a GET (not a re-POST).
   const response = NextResponse.redirect(new URL(next, request.url), {
@@ -142,11 +147,7 @@ export async function POST(request: NextRequest) {
       lastError = error.message;
     }
     console.error("[auth/confirm] token_hash verify failed:", lastError);
-    return fail(
-      request,
-      "Sign-in link couldn't be verified — request a fresh one. " +
-        `(${lastError})`,
-    );
+    return fail(request, `${t.verifyFailed} (${lastError})`);
   }
 
   // Fallback: PKCE code (Supabase default template; same browser only).
@@ -154,12 +155,8 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return response;
     console.error("[auth/confirm] code exchange failed:", error.message);
-    return fail(
-      request,
-      "Couldn't complete sign-in — open the link in the same browser you " +
-        `requested it from. (${error.message})`,
-    );
+    return fail(request, `${t.sameBrowser} (${error.message})`);
   }
 
-  return fail(request, "Sign-in link was missing or invalid.");
+  return fail(request, t.missing);
 }

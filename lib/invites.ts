@@ -1,5 +1,8 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getDictionary } from "@/lib/i18n/server";
+import { interpolate } from "@/lib/i18n/interpolate";
+import type { Dict } from "@/lib/i18n/dictionaries";
 
 /**
  * Salesman invite emails (M14). When an owner (or the admin) invites a salesman,
@@ -47,6 +50,7 @@ export async function sendSalesmanInvite(
 
   const link = await signInLinkFor(email);
   if (!link) return false;
+  const t = await getDictionary();
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -58,8 +62,8 @@ export async function sendSalesmanInvite(
       body: JSON.stringify({
         from: FROM,
         to: [email],
-        subject: `You're invited to ${orgName} on Coordination Board`,
-        html: inviteHtml(orgName, link),
+        subject: interpolate(t.email.inviteSubject, { org: orgName }),
+        html: inviteHtml(t, orgName, link),
       }),
     });
     return res.ok;
@@ -81,6 +85,7 @@ export async function sendSignInLink(email: string): Promise<boolean> {
 
   const link = await signInLinkFor(email);
   if (!link) return false;
+  const t = await getDictionary();
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -92,8 +97,8 @@ export async function sendSignInLink(email: string): Promise<boolean> {
       body: JSON.stringify({
         from: FROM,
         to: [email],
-        subject: "Your sign-in link for Coordination Board",
-        html: signInHtml(link),
+        subject: t.email.signInSubject,
+        html: signInHtml(t, link),
       }),
     });
     // Log a delivery failure so a silent fallback to same-browser PKCE is
@@ -112,36 +117,26 @@ export async function sendSignInLink(email: string): Promise<boolean> {
   }
 }
 
-function signInHtml(link: string): string {
+function signInHtml(t: Dict, link: string): string {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
-    <h2 style="margin:0 0 8px;font-size:20px">Sign in to Coordination Board</h2>
-    <p style="margin:0 0 20px;color:#475569;font-size:15px">
-      Tap below to sign in. No password — and it works on any device or browser,
-      even if that's different from where you requested this link.
-    </p>
+    <h2 style="margin:0 0 8px;font-size:20px">${t.email.signInHeading}</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:15px">${t.email.signInBody}</p>
     <a href="${link}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;font-size:15px">
-      Sign in to Coordination Board
+      ${t.email.signInButton}
     </a>
-    <p style="margin:20px 0 0;color:#94a3b8;font-size:12px">
-      If you didn't request this, you can ignore this email.
-    </p>
+    <p style="margin:20px 0 0;color:#94a3b8;font-size:12px">${t.email.signInFooter}</p>
   </div>`;
 }
 
-function inviteHtml(orgName: string, link: string): string {
+function inviteHtml(t: Dict, orgName: string, link: string): string {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
-    <h2 style="margin:0 0 8px;font-size:20px">You're on the team at ${orgName}</h2>
-    <p style="margin:0 0 20px;color:#475569;font-size:15px">
-      Tap below to sign in to your job board. No password, no setup — it opens
-      straight to the jobs assigned to you.
-    </p>
+    <h2 style="margin:0 0 8px;font-size:20px">${interpolate(t.email.inviteHeading, { org: orgName })}</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:15px">${t.email.inviteBody}</p>
     <a href="${link}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;font-size:15px">
-      Sign in to Coordination Board
+      ${t.email.inviteButton}
     </a>
-    <p style="margin:20px 0 0;color:#94a3b8;font-size:12px">
-      If you didn't expect this, you can ignore this email.
-    </p>
+    <p style="margin:20px 0 0;color:#94a3b8;font-size:12px">${t.email.inviteFooter}</p>
   </div>`;
 }

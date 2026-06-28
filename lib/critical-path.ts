@@ -7,10 +7,18 @@ import type { Phase } from "@/lib/types";
 
 export type HeadlineTone = "empty" | "done" | "blocked" | "in_progress" | "ready";
 
+/**
+ * M13: computation is language-agnostic — it returns only the FACTS (tone +
+ * phase labels + blocked reason), never a sentence. The localized sentence is
+ * built in <Headline> from the active dictionary, so EN and ES share this exact
+ * same logic. The emoji is language-neutral and stays here.
+ */
 export type Headline = {
   tone: HeadlineTone;
   emoji: string;
-  text: string;
+  frontier: string | null; // the phase to chase right now
+  reason: string | null; // blocked_reason, when blocked
+  next: string | null; // the phase after the frontier
   // Downstream phases already flagged blocked (a problem coming) — shown smaller.
   downstreamBlocked: string[];
 };
@@ -20,7 +28,9 @@ export function computeHeadline(phases: Phase[]): Headline {
     return {
       tone: "empty",
       emoji: "•",
-      text: "No phases yet — add one to start tracking.",
+      frontier: null,
+      reason: null,
+      next: null,
       downstreamBlocked: [],
     };
   }
@@ -34,7 +44,9 @@ export function computeHeadline(phases: Phase[]): Headline {
     return {
       tone: "done",
       emoji: "✅",
-      text: "All phases complete.",
+      frontier: null,
+      reason: null,
+      next: null,
       downstreamBlocked: [],
     };
   }
@@ -50,33 +62,23 @@ export function computeHeadline(phases: Phase[]): Headline {
     .filter((p) => p.status === "blocked")
     .map((p) => p.label);
 
+  const base = {
+    frontier: frontier.label,
+    next: next?.label ?? null,
+    downstreamBlocked,
+  };
+
   switch (frontier.status) {
     case "blocked":
       return {
         tone: "blocked",
         emoji: "🔴",
-        text:
-          `BLOCKED: ${frontier.label} — waiting on ${frontier.blocked_reason ?? "—"}.` +
-          (next
-            ? ` Next phase (${next.label}) can’t start until this clears.`
-            : ""),
-        downstreamBlocked,
+        reason: frontier.blocked_reason ?? "—",
+        ...base,
       };
     case "in_progress":
-      return {
-        tone: "in_progress",
-        emoji: "🟡",
-        text:
-          `IN PROGRESS: ${frontier.label}` +
-          (next ? ` — next up: ${next.label}.` : "."),
-        downstreamBlocked,
-      };
+      return { tone: "in_progress", emoji: "🟡", reason: null, ...base };
     default: // not_started
-      return {
-        tone: "ready",
-        emoji: "⚪",
-        text: `READY TO START: ${frontier.label} — nothing upstream is blocking.`,
-        downstreamBlocked,
-      };
+      return { tone: "ready", emoji: "⚪", reason: null, ...base };
   }
 }

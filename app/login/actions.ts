@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSignInAllowed } from "@/lib/access";
 import { sendSignInLink } from "@/lib/invites";
+import { getDictionary } from "@/lib/i18n/server";
 
 /**
  * Sends a sign-in email. Access is admin-gated (M14): only approved business
@@ -19,19 +20,15 @@ import { sendSignInLink } from "@/lib/invites";
  * the link in the same browser it was requested from.
  */
 export async function sendMagicLink(formData: FormData) {
+  const t = await getDictionary();
   const email = String(formData.get("email") ?? "").trim();
   if (!email) {
-    redirect("/login?error=" + encodeURIComponent("Enter your email address."));
+    redirect("/login?error=" + encodeURIComponent(t.auth.enterEmail));
   }
 
   // Admin-gated access: business owners (allowlist) + invited salesmen only.
   if (!(await isSignInAllowed(email))) {
-    redirect(
-      "/login?error=" +
-        encodeURIComponent(
-          "This email isn’t approved yet. Ask your contractor for an invite, or contact us for access.",
-        ),
-    );
+    redirect("/login?error=" + encodeURIComponent(t.auth.notApproved));
   }
 
   // Preferred: cross-device token_hash link via our own email (Resend).

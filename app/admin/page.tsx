@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireAdmin, isAdminEmail } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getDictionary } from "@/lib/i18n/server";
+import { interpolate } from "@/lib/i18n/interpolate";
 import {
   addAllowedEmail,
   addSalesmanToOrg,
@@ -25,6 +27,7 @@ const chipBtn =
 
 export default async function AdminPage() {
   await requireAdmin();
+  const t = await getDictionary();
   const svc = createServiceClient();
 
   const { data: orgsData } = await svc
@@ -51,17 +54,17 @@ export default async function AdminPage() {
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-6 p-4">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Admin
+          {t.nav.admin}
         </h1>
         <Link href="/dashboard" className={chipBtn}>
-          ← Dashboard
+          {t.admin.back}
         </Link>
       </header>
 
       {/* Accounts + trials */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-slate-900">
-          Accounts ({orgs.length})
+          {interpolate(t.admin.accounts, { n: orgs.length })}
         </h2>
         {orgs.map((o) => {
           const dl = daysLeft(o.trial_ends_at);
@@ -77,29 +80,31 @@ export default async function AdminPage() {
                 <span className="shrink-0 text-xs font-medium text-slate-500">
                   {o.subscription_status}
                   {o.subscription_status === "trialing" && dl !== null
-                    ? ` · ${dl}d left`
+                    ? " " + interpolate(t.admin.daysLeft, { d: dl })
                     : ""}
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <form action={setTrialDays.bind(null, o.id, 14)}>
-                  <button className={chipBtn}>Trial +14d</button>
+                  <button className={chipBtn}>{t.admin.trial14}</button>
                 </form>
                 <form action={setOrgStatus.bind(null, o.id, "active")}>
-                  <button className={chipBtn}>Comp (active)</button>
+                  <button className={chipBtn}>{t.admin.comp}</button>
                 </form>
                 <form action={setTrialDays.bind(null, o.id, 0)}>
-                  <button className={chipBtn}>End trial</button>
+                  <button className={chipBtn}>{t.admin.endTrial}</button>
                 </form>
                 <form action={setOrgStatus.bind(null, o.id, "canceled")}>
-                  <button className={chipBtn}>Cancel</button>
+                  <button className={chipBtn}>{t.admin.cancel}</button>
                 </form>
                 <form action={deleteAccount.bind(null, o.id)}>
                   <ConfirmSubmit
-                    message={`Permanently delete ${o.owner_email ?? o.name} and ALL their jobs? This cannot be undone.`}
+                    message={interpolate(t.admin.deleteConfirm, {
+                      who: o.owner_email ?? o.name,
+                    })}
                     className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 active:bg-red-50"
                   >
-                    Delete
+                    {t.admin.delete}
                   </ConfirmSubmit>
                 </form>
               </div>
@@ -110,17 +115,17 @@ export default async function AdminPage() {
                 >
                   <input
                     name="name"
-                    placeholder="Salesman name"
+                    placeholder={t.admin.salesmanName}
                     className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
                   />
                   <input
                     name="email"
                     type="email"
-                    placeholder="salesman@email.com"
+                    placeholder={t.admin.salesmanEmail}
                     className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-slate-900"
                   />
                   <button className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white">
-                    Add salesman
+                    {t.admin.addSalesman}
                   </button>
                 </form>
               )}
@@ -132,13 +137,9 @@ export default async function AdminPage() {
       {/* Owner List */}
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-slate-900">
-          Owner List ({allowed.length})
+          {interpolate(t.admin.ownerList, { n: allowed.length })}
         </h2>
-        <p className="text-xs text-slate-500">
-          Approved <strong>business owners</strong>. An email here can sign in,
-          gets its own company, and can invite its own salesmen. Salesmen are
-          invited by their owner — they are <em>not</em> added here.
-        </p>
+        <p className="text-xs text-slate-500">{t.admin.ownerListDesc}</p>
         {allowed.map((a) => (
           <div
             key={a.email}
@@ -147,15 +148,15 @@ export default async function AdminPage() {
             <span className="truncate">{a.email}</span>
             <form action={removeAllowedEmail.bind(null, a.email)}>
               <button className="text-xs font-medium text-red-600">
-                Remove
+                {t.admin.remove}
               </button>
             </form>
           </div>
         ))}
         <form action={addAllowedEmail} className="flex gap-2">
-          <input name="email" type="email" placeholder="owner@company.com" className={inputCls} />
+          <input name="email" type="email" placeholder={t.admin.ownerEmailPlaceholder} className={inputCls} />
           <button className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
-            Add
+            {t.admin.add}
           </button>
         </form>
       </section>

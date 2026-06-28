@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Pwa } from "@/components/Pwa";
+import { I18nProvider } from "@/components/I18nProvider";
+import { getLang } from "@/lib/i18n/server";
+import { dictionaries } from "@/lib/i18n/dictionaries";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,13 +16,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Coordination Board",
-  description:
-    "One shared status board per job. Each trade taps Done / In progress / Blocked, and the owner sees the one thing blocking the next phase.",
-  appleWebApp: { capable: true, title: "Coord Board", statusBarStyle: "default" },
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const dict = dictionaries[await getLang()];
+  return {
+    title: "Coordination Board",
+    description: dict.misc.metaDescription,
+    appleWebApp: {
+      capable: true,
+      title: "Coord Board",
+      statusBarStyle: "default",
+    },
+    icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  };
+}
 
 // Mobile-first PWA baseline (full PWA manifest + service worker arrives in M7).
 // Light-only theme for now (better outdoor/job-site readability); theme-color
@@ -31,18 +40,21 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const lang = await getLang();
   return (
     <html
-      lang="en"
+      lang={lang}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
+        <I18nProvider dict={dictionaries[lang]} lang={lang}>
+          {children}
+        </I18nProvider>
         <Pwa />
       </body>
     </html>

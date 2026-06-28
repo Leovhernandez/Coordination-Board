@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionContext, listMembers } from "@/lib/membership";
+import { getDictionary } from "@/lib/i18n/server";
+import { interpolate } from "@/lib/i18n/interpolate";
 import { inviteSalesman, removeSalesman } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,7 @@ export default async function TeamPage() {
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login");
   if (!ctx.isOwner) redirect("/dashboard"); // salesmen have no team screen
+  const t = await getDictionary();
 
   const members = await listMembers(ctx.org.id);
   const salesmen = members.filter((m) => m.role === "salesman");
@@ -23,22 +26,17 @@ export default async function TeamPage() {
           href="/dashboard"
           className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600 shadow-sm active:bg-slate-100"
         >
-          ← Dashboard
+          {t.team.back}
         </Link>
         <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
-          Team
+          {t.nav.team}
         </h1>
-        <p className="text-sm text-slate-500">
-          Add a salesman&apos;s name and email and tap Invite — we email them a
-          one-tap sign-in link automatically. They see only their own jobs; you
-          see everyone&apos;s.
-        </p>
+        <p className="text-sm text-slate-500">{t.team.description}</p>
       </header>
 
       {seatsFull ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
-          You&apos;ve used all {limit} salesman seats. Remove one below, or
-          contact us to raise your limit.
+          {interpolate(t.team.seatsFull, { limit })}
         </div>
       ) : (
         <form
@@ -46,39 +44,42 @@ export default async function TeamPage() {
           className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
         >
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Name
+            {t.team.nameLabel}
             <input
               name="name"
               required
-              placeholder="Salesman name"
+              placeholder={t.team.namePlaceholder}
               className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Email
+            {t.team.emailLabel}
             <input
               name="email"
               type="email"
               required
               inputMode="email"
               autoComplete="off"
-              placeholder="salesman@company.com"
+              placeholder={t.team.emailPlaceholder}
               className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />
           </label>
           <button className="mt-1 rounded-lg bg-slate-900 px-4 py-2.5 text-base font-semibold text-white active:bg-slate-700">
-            Invite salesman
+            {t.team.invite}
           </button>
         </form>
       )}
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-slate-500">
-          Salesmen ({salesmen.length}/{limit})
+          {interpolate(t.team.salesmenHeading, {
+            n: salesmen.length,
+            limit,
+          })}
         </h2>
         {salesmen.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
-            No salesmen yet. Invite your first above.
+            {t.team.empty}
           </p>
         )}
         {salesmen.map((m) => (
@@ -98,11 +99,11 @@ export default async function TeamPage() {
                     : "bg-amber-100 text-amber-700"
                 }`}
               >
-                {m.user_id ? "Joined" : "Invited"}
+                {m.user_id ? t.team.joined : t.team.invited}
               </span>
               <form action={removeSalesman.bind(null, m.id)}>
                 <button className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 active:bg-slate-100">
-                  Remove
+                  {t.team.remove}
                 </button>
               </form>
             </div>
