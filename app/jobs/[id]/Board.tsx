@@ -37,10 +37,15 @@ export function Board({
   jobId,
   phases,
   participants,
+  readOnly = false,
 }: {
   jobId: string;
   phases: Phase[];
   participants: CrewOption[];
+  /** M-DASH: a member viewing another member's job sees phases + statuses +
+   *  headline but NO write controls (no status buttons, no Edit phases). The
+   *  SAME component renders both so they can't drift. */
+  readOnly?: boolean;
 }) {
   const nameOf = new Map(participants.map((p) => [p.id, p.name]));
   const [, startTransition] = useTransition();
@@ -111,19 +116,21 @@ export function Board({
     <div className="flex flex-col gap-3">
       {!editMode && <Headline data={computeHeadline(optimisticPhases)} />}
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setEditMode((v) => !v)}
-          className={`rounded-full border px-3 py-1 text-sm font-medium ${
-            editMode
-              ? "border-slate-900 bg-slate-900 text-white"
-              : "border-slate-200 bg-white text-slate-600 shadow-sm active:bg-slate-100"
-          }`}
-        >
-          {editMode ? "Done editing" : "Edit phases"}
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setEditMode((v) => !v)}
+            className={`rounded-full border px-3 py-1 text-sm font-medium ${
+              editMode
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-200 bg-white text-slate-600 shadow-sm active:bg-slate-100"
+            }`}
+          >
+            {editMode ? "Done editing" : "Edit phases"}
+          </button>
+        </div>
+      )}
 
       {optimisticPhases.map((p, i) => (
         <div
@@ -211,28 +218,30 @@ export function Board({
                   </span>
                 </div>
 
-                <div className="flex gap-2">
-                  {CONTROLS.map((c) => {
-                    const isActive = p.status === c.status;
-                    return (
-                      <button
-                        key={c.status}
-                        type="button"
-                        onClick={() => onTapStatus(p, c.status)}
-                        aria-pressed={isActive}
-                        className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold transition-colors ${
-                          isActive
-                            ? STATUS_ACTIVE[c.status]
-                            : "border-slate-200 bg-white text-slate-600 active:bg-slate-100"
-                        }`}
-                      >
-                        {c.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {!readOnly && (
+                  <div className="flex gap-2">
+                    {CONTROLS.map((c) => {
+                      const isActive = p.status === c.status;
+                      return (
+                        <button
+                          key={c.status}
+                          type="button"
+                          onClick={() => onTapStatus(p, c.status)}
+                          aria-pressed={isActive}
+                          className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold transition-colors ${
+                            isActive
+                              ? STATUS_ACTIVE[c.status]
+                              : "border-slate-200 bg-white text-slate-600 active:bg-slate-100"
+                          }`}
+                        >
+                          {c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                {blockingId === p.id ? (
+                {!readOnly && blockingId === p.id ? (
                   <div className="mt-2.5 flex gap-2">
                     <input
                       value={reasonDraft}

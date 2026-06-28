@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { notFound, redirect } from "next/navigation";
+import { getSessionContext } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { participantLink } from "@/lib/participant";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { Board } from "./Board";
@@ -18,16 +19,23 @@ export default async function JobBoardPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  await requireUser();
+  const ctx = await getSessionContext();
+  if (!ctx) redirect("/login");
 
   const supabase = await createClient();
+  // RLS (post-M-VIS): any org member can READ any org job; a job in another org
+  // returns null → notFound (tenant isolation holds).
   const { data: jobData } = await supabase
     .from("jobs")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   const job = jobData as Job | null;
-  if (!job) notFound(); // RLS returns null for jobs the owner doesn't own
+  if (!job) notFound();
+
+  // Owner edits all; a salesman edits only their OWN jobs. A salesman viewing
+  // another member's job gets the read-only in-depth view.
+  const canEdit = ctx.isOwner || job.salesman_member_id === ctx.member.id;
 
   const { data: phasesData } = await supabase
     .from("phases")
@@ -36,19 +44,36 @@ export default async function JobBoardPage({
     .order("sequence_index", { ascending: true });
   const phases = (phasesData ?? []) as Phase[];
 
-  const { data: participantsData } = await supabase
-    .from("participants")
-    .select("*")
-    .eq("job_id", id)
-    .eq("revoked", false)
-    .order("created_at", { ascending: true });
-  const participants = (participantsData ?? []) as Participant[];
-  const crew = participants.map((p) => ({
-    id: p.id,
-    name: p.name,
-    phone: p.phone,
-    link: participantLink(id, p.invite_token),
-  }));
+  // Crew rows carry the secret invite_token. The owner / owning salesman read
+  // them (RLS-allowed) to manage links; a read-only viewer gets assignee NAMES
+  // ONLY, resolved server-side via the service client — never a token (§5).
+  let crew: { id: string; name: string; phone: string | null; link: string }[] = [];
+  let assignees: { id: string; name: string }[] = [];
+  if (canEdit) {
+    const { data } = await supabase
+      .from("participants")
+      .select("*")
+      .eq("job_id", id)
+      .eq("revoked", false)
+      .order("created_at", { ascending: true });
+    const participants = (data ?? []) as Participant[];
+    crew = participants.map((p) => ({
+      id: p.id,
+      name: p.name,
+      phone: p.phone,
+      link: participantLink(id, p.invite_token),
+    }));
+    assignees = participants.map((p) => ({ id: p.id, name: p.name }));
+  } else {
+    const svc = createServiceClient();
+    const { data } = await svc
+      .from("participants")
+      .select("id, name")
+      .eq("job_id", id)
+      .eq("revoked", false)
+      .order("created_at", { ascending: true });
+    assignees = (data ?? []) as { id: string; name: string }[];
+  }
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-4 p-4">
@@ -64,23 +89,36 @@ export default async function JobBoardPage({
           >
             ← Jobs
           </Link>
-          <form
-            action={
-              job.status === "archived"
-                ? unarchiveJob.bind(null, job.id)
-                : archiveJob.bind(null, job.id)
-            }
-          >
-            <button className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-500 shadow-sm active:bg-slate-100">
-              {job.status === "archived" ? "Unarchive" : "Archive"}
-            </button>
-          </form>
+          {canEdit && (
+            <form
+              action={
+                job.status === "archived"
+                  ? unarchiveJob.bind(null, job.id)
+                  : archiveJob.bind(null, job.id)
+              }
+            >
+              <button className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-500 shadow-sm active:bg-slate-100">
+                {job.status === "archived" ? "Unarchive" : "Archive"}
+              </button>
+            </form>
+          )}
         </div>
         <div className="mt-1.5 flex items-center gap-2">
-          <JobName jobId={job.id} name={job.name} />
+          {canEdit ? (
+            <JobName jobId={job.id} name={job.name} />
+          ) : (
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              {job.name}
+            </h1>
+          )}
           {job.status === "archived" && (
             <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
               Archived
+            </span>
+          )}
+          {!canEdit && (
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+              View only
             </span>
           )}
         </div>
@@ -94,10 +132,11 @@ export default async function JobBoardPage({
       <Board
         jobId={job.id}
         phases={phases}
-        participants={participants.map((p) => ({ id: p.id, name: p.name }))}
+        participants={assignees}
+        readOnly={!canEdit}
       />
 
-      <Crew jobId={job.id} crew={crew} />
+      {canEdit && <Crew jobId={job.id} crew={crew} />}
     </main>
   );
 }

@@ -28,8 +28,9 @@ export default async function DashboardPage({
   const showArchived = (await searchParams).view === "archived";
 
   const supabase = await createClient();
-  // RLS-scoped: an owner gets every job in the org (their own + all salesmen's);
-  // a salesman gets only their own. We partition the owner's set below.
+  // RLS-scoped: owner sees all org jobs; a salesman sees all org jobs read-only
+  // (post-M-VIS) or only their own (pre-migration — degrades gracefully: the
+  // team section is simply empty until the migration lands).
   const { data: jobsData } = await supabase
     .from("jobs")
     .select("*")
@@ -55,38 +56,48 @@ export default async function DashboardPage({
     phasesByJob.set(p.job_id, list);
   }
 
-  // Admin link is for the operator only — gate on the SIGNED-IN user's email,
-  // never the org owner's (a salesman in the admin's org must not see it).
+  // Admin link is for the operator only — gate on the SIGNED-IN user's email.
   const admin = isAdminEmail(email);
 
-  // Owner view splits into "my jobs" (editable) and a read-only roll-up of each
-  // salesman's jobs. A salesman only ever sees their own jobs (no roll-up).
-  const ownJobs = isOwner
-    ? jobs.filter((j) => !j.salesman_member_id || j.salesman_member_id === member.id)
-    : jobs;
+  // Symmetric partition for BOTH roles: "my jobs" (the viewer's own, editable)
+  // vs "team jobs" (everyone else's, grouped by member, read-only). A job's
+  // owning member is its salesman, or the org owner for legacy null rows.
+  const members = await listMembers(org.id);
+  const memberById = new Map(members.map((m) => [m.id, m] as const));
+  const ownerMemberId = members.find((m) => m.role === "owner")?.id ?? null;
+  const owningMemberId = (j: Job) => j.salesman_member_id ?? ownerMemberId;
 
-  const salesmenGroups: { member: Member; jobs: Job[] }[] = [];
-  if (isOwner) {
-    const members = await listMembers(org.id);
-    const memberById = new Map(members.map((m) => [m.id, m] as const));
-    const grouped = new Map<string, Job[]>();
-    for (const j of jobs) {
-      if (j.salesman_member_id && j.salesman_member_id !== member.id) {
-        const list = grouped.get(j.salesman_member_id) ?? [];
-        list.push(j);
-        grouped.set(j.salesman_member_id, list);
-      }
+  const myJobs = jobs.filter((j) => owningMemberId(j) === member.id);
+
+  const teamMap = new Map<string, Job[]>();
+  for (const j of jobs) {
+    const oid = owningMemberId(j);
+    if (oid && oid !== member.id) {
+      const list = teamMap.get(oid) ?? [];
+      list.push(j);
+      teamMap.set(oid, list);
     }
-    for (const [mid, mjobs] of grouped) {
-      const m = memberById.get(mid);
-      if (m) salesmenGroups.push({ member: m, jobs: mjobs });
-    }
-    salesmenGroups.sort((a, b) => a.member.name.localeCompare(b.member.name));
   }
+  const teamGroups: { member: Member; jobs: Job[] }[] = [];
+  for (const [mid, mjobs] of teamMap) {
+    const m = memberById.get(mid);
+    if (m) teamGroups.push({ member: m, jobs: mjobs });
+  }
+  teamGroups.sort((a, b) => a.member.name.localeCompare(b.member.name));
 
-  // Shared read-only summary used by both my-jobs cards and roll-up cards.
-  const summary = (job: Job) => (
-    <>
+  const shelf = "-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1";
+  const card =
+    "w-[85%] shrink-0 snap-start rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition active:scale-[0.99] active:bg-slate-50";
+
+  // Full card (my jobs): headline + the whole phase list. Editable on tap.
+  const fullCard = (job: Job) => (
+    <Link key={job.id} href={`/jobs/${job.id}`} className={card}>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-base font-semibold text-slate-900">{job.name}</h3>
+        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-500">
+          Open →
+        </span>
+      </div>
       {(job.address || job.customer_name) && (
         <p className="mt-0.5 text-xs text-slate-500">
           {[job.customer_name, job.address].filter(Boolean).join(" · ")}
@@ -109,13 +120,27 @@ export default async function DashboardPage({
           </li>
         ))}
       </ul>
-    </>
+    </Link>
+  );
+
+  // Compact card (team jobs): name + customer/address + headline ONLY — at a
+  // glance, no phase list (saves screen space). Tap → read-only in-depth view.
+  const compactCard = (job: Job) => (
+    <Link key={job.id} href={`/jobs/${job.id}`} className={card}>
+      <h4 className="text-base font-semibold text-slate-900">{job.name}</h4>
+      {(job.address || job.customer_name) && (
+        <p className="mt-0.5 text-xs text-slate-500">
+          {[job.customer_name, job.address].filter(Boolean).join(" · ")}
+        </p>
+      )}
+      <div className="mt-3">
+        <Headline data={computeHeadline(phasesByJob.get(job.id) ?? [])} compact />
+      </div>
+    </Link>
   );
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 p-4">
-      {/* Live updates from crew + salesmen: phases (status), jobs (new/archive),
-          org_members (a salesman renaming themselves). RLS-scoped per user. */}
       <RealtimeRefresh
         channelName="dashboard"
         tables={["phases", "jobs", "org_members"]}
@@ -128,8 +153,8 @@ export default async function DashboardPage({
             <MemberName name={member.name} />
           )}
           <p className="text-sm text-slate-500">
-            {ownJobs.length} {showArchived ? "archived" : "active"}{" "}
-            {ownJobs.length === 1 ? "job" : "jobs"}
+            {myJobs.length} {showArchived ? "archived" : "active"}{" "}
+            {myJobs.length === 1 ? "job" : "jobs"}
           </p>
         </div>
         <form action={signOut}>
@@ -192,37 +217,53 @@ export default async function DashboardPage({
         </Link>
       )}
 
-      <section className="flex flex-col gap-3">
-        {ownJobs.length === 0 && (
+      {/* My jobs — editable, horizontal shelf with full phase detail. */}
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">My jobs</h2>
+        {myJobs.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
             {showArchived
-              ? "No archived jobs."
+              ? "No archived jobs of yours."
               : "No jobs yet. Create your first one below — it starts with the standard phases."}
           </p>
+        ) : (
+          <div className={shelf}>{myJobs.map(fullCard)}</div>
         )}
-
-        {ownJobs.map((job) => (
-          <Link
-            key={job.id}
-            href={`/jobs/${job.id}`}
-            className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition active:scale-[0.99] active:bg-slate-50"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-base font-semibold text-slate-900">
-                {job.name}
-              </h2>
-              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-500">
-                Open →
-              </span>
-            </div>
-            {summary(job)}
-          </Link>
-        ))}
       </section>
 
-      {/* Read-only roll-up: each salesman's live jobs, one swipeable shelf per
-          person. Glance-only — the owner reads but never edits a salesman's job. */}
-      {isOwner && salesmenGroups.length > 0 && (
+      {/* New job — directly under My jobs (not pushed to the page bottom). */}
+      {!showArchived && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">New job</h2>
+          <form action={createJob} className="flex flex-col gap-2.5">
+            <input
+              name="name"
+              required
+              placeholder="Job name (e.g. 1428 Oak St kitchen)"
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+            />
+            <input
+              name="address"
+              placeholder="Address (optional)"
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+            />
+            <input
+              name="customer_name"
+              placeholder="Customer name (optional)"
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-700"
+            >
+              Create job
+            </button>
+          </form>
+        </section>
+      )}
+
+      {/* Team jobs — read-only compact shelves, one per other member. */}
+      {teamGroups.length > 0 && (
         <section className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-slate-900">Team jobs</h2>
@@ -230,62 +271,20 @@ export default async function DashboardPage({
               read-only
             </span>
           </div>
-          {salesmenGroups.map(({ member: sm, jobs: smJobs }) => (
-            <div key={sm.id} className="flex flex-col gap-2">
+          {teamGroups.map(({ member: tm, jobs: tj }) => (
+            <div key={tm.id} className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between gap-2">
                 <h3 className="truncate text-base font-semibold text-slate-900">
-                  {sm.name}
+                  {tm.name}
                 </h3>
                 <span className="shrink-0 text-xs text-slate-500">
-                  {smJobs.length} {smJobs.length === 1 ? "job" : "jobs"}
+                  {tj.length} {tj.length === 1 ? "job" : "jobs"}
                 </span>
               </div>
-              <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
-                {smJobs.map((job) => (
-                  <article
-                    key={job.id}
-                    className="w-[85%] shrink-0 snap-start rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <h4 className="text-base font-semibold text-slate-900">
-                      {job.name}
-                    </h4>
-                    {summary(job)}
-                  </article>
-                ))}
-              </div>
+              <div className={shelf}>{tj.map(compactCard)}</div>
             </div>
           ))}
         </section>
-      )}
-
-      {!showArchived && (
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">New job</h2>
-        <form action={createJob} className="flex flex-col gap-2.5">
-          <input
-            name="name"
-            required
-            placeholder="Job name (e.g. 1428 Oak St kitchen)"
-            className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-          />
-          <input
-            name="address"
-            placeholder="Address (optional)"
-            className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-          />
-          <input
-            name="customer_name"
-            placeholder="Customer name (optional)"
-            className="rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-          />
-          <button
-            type="submit"
-            className="rounded-lg bg-slate-900 px-4 py-3 text-base font-semibold text-white active:bg-slate-700"
-          >
-            Create job
-          </button>
-        </form>
-      </section>
       )}
     </main>
   );
