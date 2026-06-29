@@ -15,6 +15,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { OrgName } from "./OrgName";
 import { MemberName } from "./MemberName";
 import { createJob } from "./actions";
+import { TrashJobCard } from "./TrashJobCard";
 import type { Job, Phase } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,18 +30,25 @@ export default async function DashboardPage({
   const { org, isOwner, email, member } = ctx;
   const t = await getDictionary();
 
-  const showArchived = (await searchParams).view === "archived";
+  const view = (await searchParams).view;
+  const showArchived = view === "archived";
+  const showTrash = view === "trash";
 
   const supabase = await createClient();
   // RLS-scoped: owner sees all org jobs; a salesman sees all org jobs read-only
   // (post-M-VIS) or only their own (pre-migration — degrades gracefully: the
-  // team section is simply empty until the migration lands).
-  const { data: jobsData } = await supabase
-    .from("jobs")
-    .select("*")
-    .eq("org_id", org.id)
-    .eq("status", showArchived ? "archived" : "active")
-    .order("created_at", { ascending: false });
+  // team section is simply empty until the migration lands). Trash (M10) lists
+  // soft-deleted jobs regardless of status; active/archived hide them.
+  let jobsQuery = supabase.from("jobs").select("*").eq("org_id", org.id);
+  jobsQuery = showTrash
+    ? jobsQuery
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false })
+    : jobsQuery
+        .eq("status", showArchived ? "archived" : "active")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+  const { data: jobsData } = await jobsQuery;
   const jobs = (jobsData ?? []) as Job[];
 
   const jobIds = jobs.map((j) => j.id);
@@ -158,13 +166,17 @@ export default async function DashboardPage({
           )}
           <p className="text-sm text-slate-500">
             {interpolate(
-              showArchived
+              showTrash
                 ? myJobs.length === 1
-                  ? t.dashboard.archivedOne
-                  : t.dashboard.archivedMany
-                : myJobs.length === 1
-                  ? t.dashboard.activeOne
-                  : t.dashboard.activeMany,
+                  ? t.dashboard.deletedOne
+                  : t.dashboard.deletedMany
+                : showArchived
+                  ? myJobs.length === 1
+                    ? t.dashboard.archivedOne
+                    : t.dashboard.archivedMany
+                  : myJobs.length === 1
+                    ? t.dashboard.activeOne
+                    : t.dashboard.activeMany,
               { n: myJobs.length },
             )}
           </p>
@@ -183,7 +195,9 @@ export default async function DashboardPage({
         <Link
           href="/dashboard"
           className={`rounded-full px-3 py-1 text-sm font-medium ${
-            showArchived ? "text-slate-500" : "bg-slate-900 text-white"
+            !showArchived && !showTrash
+              ? "bg-slate-900 text-white"
+              : "text-slate-500"
           }`}
         >
           {t.nav.active}
@@ -195,6 +209,14 @@ export default async function DashboardPage({
           }`}
         >
           {t.nav.archived}
+        </Link>
+        <Link
+          href="/dashboard?view=trash"
+          className={`rounded-full px-3 py-1 text-sm font-medium ${
+            showTrash ? "bg-slate-900 text-white" : "text-slate-500"
+          }`}
+        >
+          {t.nav.trash}
         </Link>
         {isOwner && (
           <Link
@@ -238,24 +260,50 @@ export default async function DashboardPage({
         </Link>
       )}
 
+      {/* Trash — soft-deleted jobs the viewer owns; restore or purge (M10). */}
+      {showTrash && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">{t.nav.trash}</h2>
+          {myJobs.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
+              {t.dashboard.trashEmpty}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {myJobs.map((job) => (
+                <TrashJobCard
+                  key={job.id}
+                  id={job.id}
+                  name={job.name}
+                  customerName={job.customer_name}
+                  address={job.address}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* My jobs — editable, horizontal shelf with full phase detail. */}
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">
-          {t.dashboard.myJobs}
-        </h2>
-        {myJobs.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
-            {showArchived
-              ? t.dashboard.emptyOwnArchived
-              : t.dashboard.emptyOwnActive}
-          </p>
-        ) : (
-          <div className={shelf}>{myJobs.map(fullCard)}</div>
-        )}
-      </section>
+      {!showTrash && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            {t.dashboard.myJobs}
+          </h2>
+          {myJobs.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">
+              {showArchived
+                ? t.dashboard.emptyOwnArchived
+                : t.dashboard.emptyOwnActive}
+            </p>
+          ) : (
+            <div className={shelf}>{myJobs.map(fullCard)}</div>
+          )}
+        </section>
+      )}
 
       {/* New job — directly under My jobs (not pushed to the page bottom). */}
-      {!showArchived && (
+      {!showArchived && !showTrash && (
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             {t.dashboard.newJob}
@@ -288,7 +336,7 @@ export default async function DashboardPage({
       )}
 
       {/* Team jobs — read-only compact shelves, one per other member. */}
-      {teamGroups.length > 0 && (
+      {!showTrash && teamGroups.length > 0 && (
         <section className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-slate-900">

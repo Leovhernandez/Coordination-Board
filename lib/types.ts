@@ -28,6 +28,10 @@ export type Job = {
   // M14: which salesman member owns this job (null for pre-M14 rows until
   // backfilled). The owner sees all; a salesman sees only their own.
   salesman_member_id: string | null;
+  // M10: soft-delete timestamp (null = live). A deleted job is hidden from the
+  // active/archived lists and lives in Trash until restored or purged. Orthogonal
+  // to `status` (archive) — restore returns the job to its prior status.
+  deleted_at: string | null;
 };
 
 export type Phase = {

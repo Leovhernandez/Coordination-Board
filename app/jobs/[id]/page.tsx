@@ -11,7 +11,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { Board } from "./Board";
 import { Crew } from "./Crew";
 import { JobName } from "./JobName";
-import { archiveJob, unarchiveJob } from "./actions";
+import { archiveJob, deleteJob, unarchiveJob } from "./actions";
 import type { Job, Participant, Phase } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,9 @@ export default async function JobBoardPage({
     .eq("id", id)
     .maybeSingle();
   const job = jobData as Job | null;
-  if (!job) notFound();
+  // A soft-deleted job lives only in Trash — not viewable as a board. Restore is
+  // from the dashboard Trash view (M10).
+  if (!job || job.deleted_at) notFound();
 
   // Every member is READ-ONLY on jobs they don't own — the owner included (R2:
   // honors the read-only team roll-up, ROADMAP §4 / AGENTS §9). You edit only the
@@ -108,17 +110,24 @@ export default async function JobBoardPage({
             {t.job.back}
           </Link>
           {canEdit && (
-            <form
-              action={
-                job.status === "archived"
-                  ? unarchiveJob.bind(null, job.id)
-                  : archiveJob.bind(null, job.id)
-              }
-            >
-              <button className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-500 shadow-sm active:bg-slate-100">
-                {job.status === "archived" ? t.job.unarchive : t.job.archive}
-              </button>
-            </form>
+            <div className="flex items-center gap-2">
+              <form
+                action={
+                  job.status === "archived"
+                    ? unarchiveJob.bind(null, job.id)
+                    : archiveJob.bind(null, job.id)
+                }
+              >
+                <button className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-500 shadow-sm active:bg-slate-100">
+                  {job.status === "archived" ? t.job.unarchive : t.job.archive}
+                </button>
+              </form>
+              <form action={deleteJob.bind(null, job.id)}>
+                <button className="inline-flex items-center rounded-full border border-red-200 bg-white px-3 py-1 text-sm font-medium text-red-600 shadow-sm active:bg-red-50">
+                  {t.job.delete}
+                </button>
+              </form>
+            </div>
           )}
         </div>
         <div className="mt-1.5 flex items-center gap-2">

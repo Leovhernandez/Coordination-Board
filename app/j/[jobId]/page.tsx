@@ -47,9 +47,22 @@ export default async function ParticipantPage({
   const supabase = createServiceClient();
   const { data: job } = await supabase
     .from("jobs")
-    .select("id, name, org_id")
+    .select("id, name, org_id, deleted_at")
     .eq("id", jobId)
     .maybeSingle();
+
+  // A soft-deleted (or missing) job: the crew link is no longer active (M10).
+  if (!job || job.deleted_at) {
+    return (
+      <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-3 p-6 text-center">
+        <h1 className="text-xl font-semibold text-slate-900">
+          {t.participant.linkInactive}
+        </h1>
+        <p className="text-sm text-slate-500">{t.participant.linkInactiveHint}</p>
+      </main>
+    );
+  }
+
   // Only this participant's assigned phases ever leave the server.
   const { data: phasesData } = await supabase
     .from("phases")

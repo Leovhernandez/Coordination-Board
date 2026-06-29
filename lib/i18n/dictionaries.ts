@@ -23,6 +23,7 @@ export const en = {
   nav: {
     active: "Active",
     archived: "Archived",
+    trash: "Trash",
     team: "Team",
     billing: "Billing",
     admin: "Admin",
@@ -34,6 +35,9 @@ export const en = {
     activeMany: "{n} active jobs",
     archivedOne: "{n} archived job",
     archivedMany: "{n} archived jobs",
+    deletedOne: "{n} deleted job",
+    deletedMany: "{n} deleted jobs",
+    trashEmpty: "Trash is empty.",
     myJobs: "My jobs",
     teamJobs: "Team jobs",
     newJob: "New job",
@@ -81,6 +85,7 @@ export const en = {
     back: "← Jobs",
     archive: "Archive",
     unarchive: "Unarchive",
+    delete: "Delete",
     nameAria: "Job name",
   },
 
@@ -282,6 +287,13 @@ export const en = {
     durationHour: "{n}h",
     durationMinute: "{n}m",
   },
+
+  trash: {
+    restore: "Restore",
+    deleteForever: "Delete permanently",
+    deleteForeverConfirm:
+      'Permanently delete "{name}" and all its phases, notes, and crew? This can’t be undone.',
+  },
 };
 
 // No `as const`: leaf types widen to `string`, so `Dict` enforces that `es` has
@@ -305,6 +317,7 @@ export const es: Dict = {
   nav: {
     active: "Activos",
     archived: "Archivados",
+    trash: "Papelera",
     team: "Equipo",
     billing: "Facturación",
     admin: "Admin",
@@ -316,6 +329,9 @@ export const es: Dict = {
     activeMany: "{n} trabajos activos",
     archivedOne: "{n} trabajo archivado",
     archivedMany: "{n} trabajos archivados",
+    deletedOne: "{n} trabajo eliminado",
+    deletedMany: "{n} trabajos eliminados",
+    trashEmpty: "La papelera está vacía.",
     myJobs: "Mis trabajos",
     teamJobs: "Trabajos del equipo",
     newJob: "Nuevo trabajo",
@@ -365,6 +381,7 @@ export const es: Dict = {
     back: "← Trabajos",
     archive: "Archivar",
     unarchive: "Desarchivar",
+    delete: "Eliminar",
     nameAria: "Nombre del trabajo",
   },
 
@@ -568,6 +585,13 @@ export const es: Dict = {
     durationDay: "{n}d",
     durationHour: "{n}h",
     durationMinute: "{n}m",
+  },
+
+  trash: {
+    restore: "Restaurar",
+    deleteForever: "Eliminar definitivamente",
+    deleteForeverConfirm:
+      '¿Eliminar definitivamente "{name}" y todas sus fases, notas y cuadrilla? Esto no se puede deshacer.',
   },
 };
 

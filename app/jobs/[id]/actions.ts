@@ -430,3 +430,58 @@ export async function unarchiveJob(jobId: string) {
   await supabase.from("jobs").update({ status: "active" }).eq("id", jobId);
   await revalidateJob(jobId);
 }
+
+// --- Soft-delete / restore / purge (M10) ---
+
+/**
+ * Soft-deletes a job (moves it to Trash). Mirrors archiveJob's enforcement: the
+ * Delete control shows only when canEdit, and the jobs write RLS scopes the UPDATE
+ * to the owner / owning salesman. Reversible via restoreJob — so, like archive, no
+ * confirm. Refreshes the crew board too (its link goes inactive while trashed).
+ */
+export async function deleteJob(jobId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("jobs")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", jobId);
+  if (error) return;
+  revalidatePath("/dashboard");
+  revalidatePath(`/j/${jobId}`);
+  await broadcastJobChange(jobId);
+  redirect("/dashboard");
+}
+
+/** Restores a trashed job (clears deleted_at; its prior status is untouched). */
+export async function restoreJob(jobId: string) {
+  const supabase = await createClient();
+  await supabase.from("jobs").update({ deleted_at: null }).eq("id", jobId);
+  revalidatePath("/dashboard");
+  revalidatePath(`/j/${jobId}`);
+  await broadcastJobChange(jobId);
+}
+
+/**
+ * Permanently deletes a job — hard DELETE, cascading to phases/notes/participants/
+ * activity_log via their ON DELETE CASCADE FKs (M22 will extend this to free the
+ * job's R2 photos). Irreversible, so it re-checks canEdit server-side rather than
+ * trusting the UI: the jobs write RLS would let the OWNER delete a salesman's job,
+ * but R2 says the owner is read-only on jobs they don't own — so block that here.
+ */
+export async function purgeJob(jobId: string) {
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+  const supabase = await createClient();
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("salesman_member_id")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job) return;
+  const canEdit =
+    job.salesman_member_id === ctx.member.id ||
+    (ctx.isOwner && !job.salesman_member_id);
+  if (!canEdit) return;
+  await supabase.from("jobs").delete().eq("id", jobId);
+  revalidatePath("/dashboard");
+}
