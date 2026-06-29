@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/membership";
 import { broadcastJobChange } from "@/lib/realtime";
+import { logActivity } from "@/lib/activity";
 import type { PhaseStatus } from "@/lib/types";
 
 async function revalidateJob(jobId: string) {
@@ -39,16 +40,44 @@ export async function setPhaseStatus(
     status === "blocked" ? (blockedReason?.trim() || null) : null;
   if (status === "blocked" && !reason) return; // guard; UI prevents this
 
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+
   const supabase = await createClient();
-  const { error } = await supabase
+  // Prior status for the log's {from}. A read-only viewer can READ it (RLS allows
+  // org reads) but their update below affects 0 rows, so we never log their attempt.
+  const { data: before } = await supabase
+    .from("phases")
+    .select("status")
+    .eq("id", phaseId)
+    .maybeSingle();
+
+  const { data: updated, error } = await supabase
     .from("phases")
     .update({
       status,
       blocked_reason: reason,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", phaseId);
-  if (error) return;
+    .eq("id", phaseId)
+    .select("id");
+  if (error || !updated || updated.length === 0) return; // no write → no log
+
+  // Skip a no-op re-tap of the current status; a (re)block can refresh the reason,
+  // so it's still worth recording.
+  if ((before?.status ?? null) !== status || status === "blocked") {
+    await logActivity({
+      jobId,
+      phaseId,
+      eventType: "status_change",
+      actorMemberId: ctx.member.id,
+      detail: {
+        from: before?.status ?? null,
+        to: status,
+        ...(reason ? { reason } : {}),
+      },
+    });
+  }
 
   await revalidateJob(jobId);
 }
@@ -57,6 +86,8 @@ export async function setPhaseStatus(
 export async function addPhase(jobId: string, label: string) {
   const name = label.trim();
   if (!name) return;
+  const ctx = await getSessionContext();
+  if (!ctx) return;
 
   const supabase = await createClient();
   const { data: last } = await supabase
@@ -68,9 +99,20 @@ export async function addPhase(jobId: string, label: string) {
     .maybeSingle();
   const nextIndex = (last?.sequence_index ?? -1) + 1;
 
-  await supabase
+  const { data: created, error } = await supabase
     .from("phases")
-    .insert({ job_id: jobId, label: name, sequence_index: nextIndex });
+    .insert({ job_id: jobId, label: name, sequence_index: nextIndex })
+    .select("id")
+    .single();
+  if (error || !created) return; // RLS-blocked insert errors → no log
+
+  await logActivity({
+    jobId,
+    phaseId: created.id,
+    eventType: "phase_added",
+    actorMemberId: ctx.member.id,
+    detail: { label: name },
+  });
   await revalidateJob(jobId);
 }
 
@@ -82,16 +124,64 @@ export async function renamePhase(
 ) {
   const name = label.trim();
   if (!name) return;
+  const ctx = await getSessionContext();
+  if (!ctx) return;
 
   const supabase = await createClient();
-  await supabase.from("phases").update({ label: name }).eq("id", phaseId);
+  const { data: before } = await supabase
+    .from("phases")
+    .select("label")
+    .eq("id", phaseId)
+    .maybeSingle();
+
+  const { data: updated, error } = await supabase
+    .from("phases")
+    .update({ label: name })
+    .eq("id", phaseId)
+    .select("id");
+  if (error || !updated || updated.length === 0) return;
+
+  if ((before?.label ?? null) !== name) {
+    await logActivity({
+      jobId,
+      phaseId,
+      eventType: "label_change",
+      actorMemberId: ctx.member.id,
+      detail: { from: before?.label ?? null, to: name },
+    });
+  }
   await revalidateJob(jobId);
 }
 
 /** Deletes a phase. Gaps in sequence_index are fine (display numbers by position). */
 export async function deletePhase(phaseId: string, jobId: string) {
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+
   const supabase = await createClient();
-  await supabase.from("phases").delete().eq("id", phaseId);
+  // Capture the label for the log BEFORE the row is gone, then delete and confirm
+  // a row was actually removed (a read-only viewer's delete affects 0 rows).
+  const { data: before } = await supabase
+    .from("phases")
+    .select("label")
+    .eq("id", phaseId)
+    .maybeSingle();
+  const { data: deleted, error } = await supabase
+    .from("phases")
+    .delete()
+    .eq("id", phaseId)
+    .select("id");
+  if (error || !deleted || deleted.length === 0) return;
+
+  // phase_id is null: the FK would null it on delete anyway, and the phase no
+  // longer exists to reference. The label in detail preserves the context.
+  await logActivity({
+    jobId,
+    phaseId: null,
+    eventType: "phase_deleted",
+    actorMemberId: ctx.member.id,
+    detail: { label: before?.label ?? null },
+  });
   await revalidateJob(jobId);
 }
 
@@ -183,11 +273,48 @@ export async function assignPhase(
   jobId: string,
   participantId: string | null,
 ) {
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+
   const supabase = await createClient();
-  await supabase
+  const { data: before } = await supabase
+    .from("phases")
+    .select("assignee_participant_id")
+    .eq("id", phaseId)
+    .maybeSingle();
+  const fromId = before?.assignee_participant_id ?? null;
+
+  const { data: updated, error } = await supabase
     .from("phases")
     .update({ assignee_participant_id: participantId })
-    .eq("id", phaseId);
+    .eq("id", phaseId)
+    .select("id");
+  if (error || !updated || updated.length === 0) return;
+
+  if (fromId !== participantId) {
+    // Resolve participant ids → names for a human-readable log entry.
+    const ids = [fromId, participantId].filter((x): x is string => !!x);
+    const names = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data } = await supabase
+        .from("participants")
+        .select("id, name")
+        .in("id", ids);
+      for (const r of (data ?? []) as { id: string; name: string }[]) {
+        names.set(r.id, r.name);
+      }
+    }
+    await logActivity({
+      jobId,
+      phaseId,
+      eventType: "assignment_change",
+      actorMemberId: ctx.member.id,
+      detail: {
+        from: fromId ? (names.get(fromId) ?? null) : null,
+        to: participantId ? (names.get(participantId) ?? null) : null,
+      },
+    });
+  }
   await revalidateJob(jobId);
 }
 
@@ -206,13 +333,25 @@ export async function addNote(jobId: string, phaseId: string, body: string) {
   if (!ctx) return;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("notes").insert({
-    phase_id: phaseId,
-    job_id: jobId,
-    author_member_id: ctx.member.id,
-    body: text,
+  const { data: created, error } = await supabase
+    .from("notes")
+    .insert({
+      phase_id: phaseId,
+      job_id: jobId,
+      author_member_id: ctx.member.id,
+      body: text,
+    })
+    .select("id")
+    .single();
+  if (error || !created) return;
+
+  await logActivity({
+    jobId,
+    phaseId,
+    noteId: created.id,
+    eventType: "note_added",
+    actorMemberId: ctx.member.id,
   });
-  if (error) return;
   await revalidateJob(jobId);
 }
 
@@ -221,20 +360,57 @@ export async function addNote(jobId: string, phaseId: string, body: string) {
 export async function editNote(noteId: string, jobId: string, body: string) {
   const text = body.trim();
   if (!text) return;
+  const ctx = await getSessionContext();
+  if (!ctx) return;
 
   const supabase = await createClient();
-  const { error } = await supabase
+  // .select("id, phase_id") both confirms the write landed (RLS no-op → 0 rows)
+  // and gives the phase to group the log entry under.
+  const { data: updated, error } = await supabase
     .from("notes")
     .update({ body: text, updated_at: new Date().toISOString() })
-    .eq("id", noteId);
-  if (error) return;
+    .eq("id", noteId)
+    .select("id, phase_id");
+  if (error || !updated || updated.length === 0) return;
+
+  await logActivity({
+    jobId,
+    phaseId: updated[0].phase_id as string,
+    noteId,
+    eventType: "note_edited",
+    actorMemberId: ctx.member.id,
+  });
   await revalidateJob(jobId);
 }
 
 /** Deletes a member's OWN note (RLS owns_member; no-op on another's note). */
 export async function deleteNote(noteId: string, jobId: string) {
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+
   const supabase = await createClient();
-  await supabase.from("notes").delete().eq("id", noteId);
+  // Capture the phase to group the log under, then delete and confirm a row went.
+  const { data: before } = await supabase
+    .from("notes")
+    .select("phase_id")
+    .eq("id", noteId)
+    .maybeSingle();
+  const { data: deleted, error } = await supabase
+    .from("notes")
+    .delete()
+    .eq("id", noteId)
+    .select("id");
+  if (error || !deleted || deleted.length === 0) return;
+
+  // note_id null (the note is gone — the FK would null it anyway); phase_id is kept
+  // so the entry still shows under its phase's History.
+  await logActivity({
+    jobId,
+    phaseId: (before?.phase_id as string | undefined) ?? null,
+    noteId: null,
+    eventType: "note_deleted",
+    actorMemberId: ctx.member.id,
+  });
   await revalidateJob(jobId);
 }
 

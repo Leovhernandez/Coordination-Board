@@ -265,6 +265,23 @@ export const en = {
     crewTag: "crew",
     edited: "edited",
   },
+
+  history: {
+    toggle: "History ({n})",
+    statusSet: "{actor} set {status}",
+    renamed: "{actor} renamed to “{label}”",
+    assigned: "{actor} assigned {name}",
+    unassigned: "{actor} cleared the assignment",
+    phaseAdded: "{actor} added this phase",
+    phaseDeleted: "{actor} deleted {label}",
+    noteAdded: "{actor} added a note",
+    noteEdited: "{actor} edited a note",
+    noteDeleted: "{actor} deleted a note",
+    blockedFor: "Blocked {duration}",
+    durationDay: "{n}d",
+    durationHour: "{n}h",
+    durationMinute: "{n}m",
+  },
 };
 
 // No `as const`: leaf types widen to `string`, so `Dict` enforces that `es` has
@@ -534,6 +551,23 @@ export const es: Dict = {
     deleteConfirm: "¿Eliminar esta nota?",
     crewTag: "cuadrilla",
     edited: "editado",
+  },
+
+  history: {
+    toggle: "Historial ({n})",
+    statusSet: "{actor} marcó {status}",
+    renamed: "{actor} renombró a “{label}”",
+    assigned: "{actor} asignó a {name}",
+    unassigned: "{actor} quitó la asignación",
+    phaseAdded: "{actor} agregó esta fase",
+    phaseDeleted: "{actor} eliminó {label}",
+    noteAdded: "{actor} agregó una nota",
+    noteEdited: "{actor} editó una nota",
+    noteDeleted: "{actor} eliminó una nota",
+    blockedFor: "Bloqueado {duration}",
+    durationDay: "{n}d",
+    durationHour: "{n}h",
+    durationMinute: "{n}m",
   },
 };
 

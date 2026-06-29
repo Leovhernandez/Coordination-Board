@@ -77,3 +77,42 @@ export type NoteView = {
   updatedAt: string;
   canEdit: boolean;
 };
+
+// M18: append-only activity log. event_type values are constrained by a CHECK in
+// 20260629140000_m18_activity_log.sql — keep this union in sync with it. Two-sided
+// actor (member XOR participant, like Note); detail carries the human-readable
+// context copied at write time ({from,to,reason,label,...}) so a row stays
+// meaningful after its phase/note FK is nulled on delete.
+export type ActivityEventType =
+  | "status_change"
+  | "label_change"
+  | "assignment_change"
+  | "phase_added"
+  | "phase_deleted"
+  | "note_added"
+  | "note_edited"
+  | "note_deleted";
+
+export type ActivityEvent = {
+  id: string;
+  job_id: string;
+  phase_id: string | null;
+  note_id: string | null;
+  event_type: ActivityEventType;
+  actor_member_id: string | null;
+  actor_participant_id: string | null;
+  detail: Record<string, unknown>;
+  created_at: string;
+};
+
+// An activity row shaped for display: actor resolved to a name + side. Powers the
+// per-phase History disclosure and (via status_change → blocked) the duration pill.
+export type ActivityView = {
+  id: string;
+  phaseId: string | null;
+  eventType: ActivityEventType;
+  actorName: string;
+  actorType: "member" | "crew" | "system";
+  detail: Record<string, unknown>;
+  createdAt: string;
+};

@@ -1,12 +1,15 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import type { NoteView, Phase, PhaseStatus } from "@/lib/types";
+import type { ActivityView, NoteView, Phase, PhaseStatus } from "@/lib/types";
 import { STATUS_ACCENT, STATUS_ACTIVE, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
+import { elapsedCompact } from "@/lib/relative-time";
 import { Headline } from "@/components/Headline";
 import { PhaseNotes } from "@/components/PhaseNotes";
+import { PhaseHistory } from "@/components/PhaseHistory";
 import { useT } from "@/components/I18nProvider";
+import type { Dict } from "@/lib/i18n/dictionaries";
 import { interpolate } from "@/lib/i18n/interpolate";
 import {
   addNote,
@@ -31,11 +34,36 @@ type OptimisticUpdate = {
 // Status controls (labels come from the dictionary via t.status[...]).
 const CONTROLS: PhaseStatus[] = ["in_progress", "blocked", "done"];
 
+// M18 blocker duration: the "blocked since" instant is the timestamp of the latest
+// status_change INTO blocked for this phase (events arrive ascending, so scan from
+// the end). Returns null until that event is logged — the pill simply waits.
+function blockedSinceOf(events: ActivityView[]): string | null {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    const to = (e.detail as { to?: unknown } | null)?.to;
+    if (e.eventType === "status_change" && to === "blocked") return e.createdAt;
+  }
+  return null;
+}
+
+// Compact "3d" / "5h" / "2m" label for the pill, localized via the dictionary.
+function durationLabel(sinceIso: string, t: Dict): string {
+  const { unit, value } = elapsedCompact(sinceIso);
+  const template =
+    unit === "day"
+      ? t.history.durationDay
+      : unit === "hour"
+        ? t.history.durationHour
+        : t.history.durationMinute;
+  return interpolate(template, { n: value });
+}
+
 export function Board({
   jobId,
   phases,
   participants,
   notesByPhase = {},
+  activityByPhase = {},
   readOnly = false,
 }: {
   jobId: string;
@@ -43,6 +71,9 @@ export function Board({
   participants: CrewOption[];
   /** M17: notes per phase id, author resolved + canEdit precomputed server-side. */
   notesByPhase?: Record<string, NoteView[]>;
+  /** M18: activity events per phase id (actor resolved server-side), newest last.
+   *  Powers the History disclosure + the "Blocked Nd" duration pill. */
+  activityByPhase?: Record<string, ActivityView[]>;
   /** M-DASH: a member viewing another member's job sees phases + statuses +
    *  headline but NO write controls (no status buttons, no Edit phases). The
    *  SAME component renders both so they can't drift. */
@@ -134,7 +165,11 @@ export function Board({
         </div>
       )}
 
-      {optimisticPhases.map((p, i) => (
+      {optimisticPhases.map((p, i) => {
+        const phaseEvents = activityByPhase[p.id] ?? [];
+        const blockedSince =
+          p.status === "blocked" ? blockedSinceOf(phaseEvents) : null;
+        return (
         <div
           key={p.id}
           className="flex overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
@@ -211,11 +246,20 @@ export function Board({
                         </span>
                       )}
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
-                  >
-                    {t.status[p.status]}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {blockedSince && (
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                        {interpolate(t.history.blockedFor, {
+                          duration: durationLabel(blockedSince, t),
+                        })}
+                      </span>
+                    )}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[p.status]}`}
+                    >
+                      {t.status[p.status]}
+                    </span>
+                  </div>
                 </div>
 
                 {!readOnly && (
@@ -282,11 +326,14 @@ export function Board({
                   onEdit={(noteId, body) => editNote(noteId, jobId, body)}
                   onDelete={(noteId) => deleteNote(noteId, jobId)}
                 />
+
+                <PhaseHistory events={phaseEvents} />
               </>
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {editMode && (
         <div className="flex gap-2">

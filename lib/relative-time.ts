@@ -22,3 +22,17 @@ export function relativeTime(iso: string, lang: Lang): string {
   }
   return rtf.format(diffSec, "second");
 }
+
+// M18: elapsed time since `iso` as a COMPACT {unit, value} for the "Blocked Nd"
+// pill — distinct from relativeTime's prose. Returns the largest whole unit (day →
+// hour → minute); the caller picks the localized template (history.durationDay/
+// Hour/Minute) so the wording stays in the dictionary. Clamped at 0 (never future).
+export function elapsedCompact(iso: string): {
+  unit: "day" | "hour" | "minute";
+  value: number;
+} {
+  const sec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (sec >= 86_400) return { unit: "day", value: Math.floor(sec / 86_400) };
+  if (sec >= 3_600) return { unit: "hour", value: Math.floor(sec / 3_600) };
+  return { unit: "minute", value: Math.floor(sec / 60) };
+}

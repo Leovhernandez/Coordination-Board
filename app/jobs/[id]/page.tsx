@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { participantLink } from "@/lib/participant";
 import { notesForJob } from "@/lib/notes";
+import { activityForJob } from "@/lib/activity";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { getDictionary } from "@/lib/i18n/server";
 import { Board } from "./Board";
@@ -54,6 +55,11 @@ export default async function JobBoardPage({
   // M17: notes for every phase, author resolved + per-note canEdit precomputed for
   // this viewer (only their own member notes are editable — mirrors RLS).
   const notesByPhase = await notesForJob(job.id, job.org_id, ctx.member.id);
+
+  // M18: activity per phase (actor names resolved server-side) for the History
+  // disclosure + blocker-duration pill. Display-only; same data on the editable
+  // board and the read-only in-depth view.
+  const activityByPhase = await activityForJob(job.id, job.org_id);
 
   // Crew rows carry the secret invite_token. The owner / owning salesman read
   // them (RLS-allowed) to manage links; a read-only viewer gets assignee NAMES
@@ -146,6 +152,7 @@ export default async function JobBoardPage({
         phases={phases}
         participants={assignees}
         notesByPhase={notesByPhase}
+        activityByPhase={activityByPhase}
         readOnly={!canEdit}
       />
 

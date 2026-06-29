@@ -8,6 +8,7 @@ import {
   participantCookieName,
 } from "@/lib/participant";
 import { broadcastJobChange } from "@/lib/realtime";
+import { logActivity } from "@/lib/activity";
 import type { PhaseStatus } from "@/lib/types";
 
 /** Refresh every surface a crew action touches: the crew board, the owner/salesman
@@ -42,7 +43,7 @@ export async function updateAssignedPhase(
 
   const { data: phase } = await supabase
     .from("phases")
-    .select("id, job_id, assignee_participant_id")
+    .select("id, job_id, assignee_participant_id, status")
     .eq("id", phaseId)
     .maybeSingle();
   if (
@@ -69,6 +70,18 @@ export async function updateAssignedPhase(
     .from("participants")
     .update({ last_seen_at: new Date().toISOString() })
     .eq("id", participant.id);
+
+  // Log the change (actor = this crew participant). Skip a no-op re-tap; a
+  // (re)block can refresh the reason, so record that.
+  if (phase.status !== status || status === "blocked") {
+    await logActivity({
+      jobId,
+      phaseId,
+      eventType: "status_change",
+      actorParticipantId: participant.id,
+      detail: { from: phase.status, to: status, ...(reason ? { reason } : {}) },
+    });
+  }
 
   await revalidateCrew(jobId);
 }
@@ -102,12 +115,25 @@ export async function addCrewNote(jobId: string, phaseId: string, body: string) 
     return; // not this participant's phase
   }
 
-  await supabase.from("notes").insert({
-    phase_id: phaseId,
-    job_id: jobId,
-    author_participant_id: participant.id,
-    body: text,
-  });
+  const { data: created } = await supabase
+    .from("notes")
+    .insert({
+      phase_id: phaseId,
+      job_id: jobId,
+      author_participant_id: participant.id,
+      body: text,
+    })
+    .select("id")
+    .single();
+  if (created) {
+    await logActivity({
+      jobId,
+      phaseId,
+      noteId: created.id,
+      eventType: "note_added",
+      actorParticipantId: participant.id,
+    });
+  }
   await revalidateCrew(jobId);
 }
 
@@ -122,7 +148,7 @@ export async function editCrewNote(jobId: string, noteId: string, body: string) 
   const supabase = createServiceClient();
   const { data: note } = await supabase
     .from("notes")
-    .select("id, job_id, author_participant_id")
+    .select("id, job_id, phase_id, author_participant_id")
     .eq("id", noteId)
     .maybeSingle();
   if (!note || note.job_id !== jobId || note.author_participant_id !== participant.id) {
@@ -133,6 +159,13 @@ export async function editCrewNote(jobId: string, noteId: string, body: string) 
     .from("notes")
     .update({ body: text, updated_at: new Date().toISOString() })
     .eq("id", noteId);
+  await logActivity({
+    jobId,
+    phaseId: note.phase_id,
+    noteId,
+    eventType: "note_edited",
+    actorParticipantId: participant.id,
+  });
   await revalidateCrew(jobId);
 }
 
@@ -145,7 +178,7 @@ export async function deleteCrewNote(jobId: string, noteId: string) {
   const supabase = createServiceClient();
   const { data: note } = await supabase
     .from("notes")
-    .select("id, job_id, author_participant_id")
+    .select("id, job_id, phase_id, author_participant_id")
     .eq("id", noteId)
     .maybeSingle();
   if (!note || note.job_id !== jobId || note.author_participant_id !== participant.id) {
@@ -153,5 +186,14 @@ export async function deleteCrewNote(jobId: string, noteId: string) {
   }
 
   await supabase.from("notes").delete().eq("id", noteId);
+  // note_id null (note gone — FK would null it); phase_id kept so it shows under
+  // the phase's History.
+  await logActivity({
+    jobId,
+    phaseId: note.phase_id,
+    noteId: null,
+    eventType: "note_deleted",
+    actorParticipantId: participant.id,
+  });
   await revalidateCrew(jobId);
 }
