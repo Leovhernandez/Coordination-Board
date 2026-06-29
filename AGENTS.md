@@ -63,6 +63,37 @@ The subsystems that regress **silently** must be re-checked on **every** change:
   tokens).
 - **Critical-path headline** (§2 — the centerpiece must still compute correctly).
 
+**Live-refresh is a perpetual, affirmative invariant (binding — owner-mandated).**
+The board's entire value is that whoever is watching sees a change the instant it
+happens, hands-free; a board that can sit stale is useless for coordination.
+Therefore **every data-bearing feature — those built today and every one added in the
+future, without exception — that appears on a surface another session may be viewing
+MUST live-refresh that surface with no manual reload.** "It updates on the next page
+load" is a **failed feature**, not an acceptable shortcut — it does not ship. This
+binds in perpetuity to all applicable actions: job/phase status, label, assignment,
+add, and delete; blocker reason and duration; phase notes; the History / activity
+log; the dashboards and owner roll-up; and anything not yet conceived.
+
+A feature is **not "done"** (and a milestone's "Done when" is unmet) until its
+live-refresh is **verified on a SECOND device/session** — never the actor's own
+screen, whose server-action revalidation hides the gap. Each time you add or change a
+data-bearing feature, clear this checklist (every item is a bug that already shipped
+once):
+  1. The backing table is in the `supabase_realtime` publication, **or** the write
+     fires `broadcastJobChange` (anon crew get no RLS-filtered `postgres_changes`, so
+     they refresh via the broadcast channel).
+  2. **One channel per table** (FIX-1): a table missing from the publication must not
+     drop the other tables' channels.
+  3. A **DELETE** that must match a `job_id`/RLS filter needs `REPLICA IDENTITY FULL`
+     — a default-identity DELETE carries only the PK, so the filter/RLS can't match and
+     the event is silently dropped (M17 R1).
+  4. The event that DRIVES the refresh must commit **after** the data it must show, or
+     **publish the backing table itself** so its own insert/update drives the re-fetch
+     (M18: a row co-written a round-trip later is missed by a refresh fired off the
+     earlier commit — the activity_log live-refresh race).
+  5. Confirm the owner dashboard, the salesman dashboard/roll-up, **and** the
+     participant board each refresh for the relevant change.
+
 Schema/RLS and auth changes additionally require the **RLS pre-flight**
 (RELEASE-CHECKLIST Step 2) to pass before they reach `main`.
 
