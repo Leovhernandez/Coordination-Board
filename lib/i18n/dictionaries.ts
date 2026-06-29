@@ -236,6 +236,23 @@ export const en = {
     metaDescription:
       "One shared status board per job. Each trade taps Done / In progress / Blocked, and the owner sees the one thing blocking the next phase.",
   },
+
+  pwa: {
+    installLead: "Install: tap",
+    installMid: "Share, then",
+    addToHomeScreen: "Add to Home Screen",
+    dismiss: "Dismiss",
+  },
+
+  health: {
+    heading: "Health",
+    scaffold: "Coordination Board — M0 scaffold",
+    allOk: "App is running and all environment variables are present.",
+    someMissing:
+      "App is running, but some environment variables are missing. Copy .env.local.example to .env.local and fill them in.",
+    present: "present",
+    missing: "missing",
+  },
 };
 
 // No `as const`: leaf types widen to `string`, so `Dict` enforces that `es` has
@@ -475,6 +492,24 @@ export const es: Dict = {
     companyNameAria: "Nombre de tu empresa",
     metaDescription:
       "Un tablero de estado compartido por trabajo. Cada oficio toca Hecho / En progreso / Bloqueado, y el dueño ve lo único que detiene la siguiente fase.",
+  },
+
+  pwa: {
+    installLead: "Instalar: toca",
+    installMid: "Compartir, luego",
+    addToHomeScreen: "Agregar a la pantalla de inicio",
+    dismiss: "Descartar",
+  },
+
+  health: {
+    heading: "Estado",
+    scaffold: "Coordination Board — andamiaje M0",
+    allOk:
+      "La app está funcionando y todas las variables de entorno están presentes.",
+    someMissing:
+      "La app está funcionando, pero faltan algunas variables de entorno. Copia .env.local.example a .env.local y complétalas.",
+    present: "presente",
+    missing: "faltante",
   },
 };
 

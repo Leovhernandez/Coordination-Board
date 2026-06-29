@@ -54,8 +54,8 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <I18nProvider dict={dictionaries[lang]} lang={lang}>
           {children}
+          <Pwa />
         </I18nProvider>
-        <Pwa />
       </body>
     </html>
   );

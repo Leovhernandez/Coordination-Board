@@ -54,8 +54,8 @@ are reflected in the constitution at `AGENTS.md` §9.
 | **M23** | **Incentive scoreboard** | **Pro** | Validate with Trinity first. |
 
 **Also still relevant from earlier backlog:** M10 soft-delete+restore+purge, M11
-phase deadlines, M12 owner email alerts (Resend), **M13 Spanish UI toggle**
-(now higher priority — flooring crews are often Spanish-first).
+phase deadlines, M12 owner email alerts (Resend). **M13 Spanish/English UI** —
+✅ **Done** (full-app EN/ES toggle + auto-detect, display-only; emails included).
 
 ### Deferred / cut
 - **Master files / invoices per house** → Enterprise only, unvalidated; it's a

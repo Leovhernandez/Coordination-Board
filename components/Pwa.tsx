@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/components/I18nProvider";
 
 /**
  * Registers the service worker app-wide and shows a small, dismissible install
@@ -8,6 +9,7 @@ import { useEffect, useState } from "react";
  * browser's own prompt. Install is always optional — never blocks the app.
  */
 export function Pwa() {
+  const t = useT();
   const [showIosHint, setShowIosHint] = useState(false);
 
   useEffect(() => {
@@ -33,8 +35,8 @@ export function Pwa() {
   return (
     <div className="fixed inset-x-3 bottom-3 z-50 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg">
       <span className="flex-1 text-slate-700">
-        Install: tap <span aria-hidden>⎋</span> Share, then{" "}
-        <span className="font-medium">Add to Home Screen</span>.
+        {t.pwa.installLead} <span aria-hidden>⎋</span> {t.pwa.installMid}{" "}
+        <span className="font-medium">{t.pwa.addToHomeScreen}</span>.
       </span>
       <button
         type="button"
@@ -44,7 +46,7 @@ export function Pwa() {
         }}
         className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500"
       >
-        Dismiss
+        {t.pwa.dismiss}
       </button>
     </div>
   );

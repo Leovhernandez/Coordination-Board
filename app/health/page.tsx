@@ -1,12 +1,15 @@
 // Health page (M0): confirms the app boots and reports whether each required
 // environment variable is PRESENT. It never prints secret values.
+import { getDictionary } from "@/lib/i18n/server";
+
 export const dynamic = "force-dynamic";
 
 function present(value: string | undefined): boolean {
   return Boolean(value && value.length > 0);
 }
 
-export default function HealthPage() {
+export default async function HealthPage() {
+  const t = await getDictionary();
   const checks = [
     {
       key: "NEXT_PUBLIC_SUPABASE_URL",
@@ -31,8 +34,8 @@ export default function HealthPage() {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-6 p-6">
       <header>
-        <h1 className="text-2xl font-semibold">Health</h1>
-        <p className="text-sm text-gray-500">Coordination Board — M0 scaffold</p>
+        <h1 className="text-2xl font-semibold">{t.health.heading}</h1>
+        <p className="text-sm text-gray-500">{t.health.scaffold}</p>
       </header>
 
       <div
@@ -42,9 +45,7 @@ export default function HealthPage() {
             : "border-amber-300 bg-amber-50 text-amber-800"
         }`}
       >
-        {allOk
-          ? "App is running and all environment variables are present."
-          : "App is running, but some environment variables are missing. Copy .env.local.example to .env.local and fill them in."}
+        {allOk ? t.health.allOk : t.health.someMissing}
       </div>
 
       <ul className="flex flex-col gap-2">
@@ -59,7 +60,7 @@ export default function HealthPage() {
                 c.ok ? "text-green-600" : "text-red-600"
               }`}
             >
-              {c.ok ? "present" : "missing"}
+              {c.ok ? t.health.present : t.health.missing}
             </span>
           </li>
         ))}
