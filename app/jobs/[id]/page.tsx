@@ -97,7 +97,7 @@ export default async function JobBoardPage({
       <RealtimeRefresh
         channelName={`phases-job-${job.id}`}
         filter={`job_id=eq.${job.id}`}
-        tables={["phases", "notes"]}
+        tables={["phases", "notes", "activity_log"]}
       />
       <header>
         <div className="flex items-center justify-between">
