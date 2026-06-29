@@ -50,3 +50,30 @@ export type Participant = {
   revoked: boolean;
   last_seen_at: string | null;
 };
+
+// M17: a small, structured note on a phase (gate/lockbox codes, access info, URLs).
+// Two-sided author — exactly one of author_member_id / author_participant_id is set
+// (DB CHECK). Not chat: no threads/replies (AGENTS.md §7).
+export type Note = {
+  id: string;
+  phase_id: string;
+  job_id: string;
+  author_member_id: string | null;
+  author_participant_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// A note shaped for display: author resolved to a name, and whether the CURRENT
+// viewer may edit it (computed server-side to mirror the RLS / token rules).
+export type NoteView = {
+  id: string;
+  phaseId: string;
+  body: string;
+  authorName: string;
+  authorType: "member" | "crew";
+  createdAt: string;
+  updatedAt: string;
+  canEdit: boolean;
+};

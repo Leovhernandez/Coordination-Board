@@ -4,6 +4,7 @@ import { getSessionContext } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { participantLink } from "@/lib/participant";
+import { notesForJob } from "@/lib/notes";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { getDictionary } from "@/lib/i18n/server";
 import { Board } from "./Board";
@@ -35,9 +36,13 @@ export default async function JobBoardPage({
   const job = jobData as Job | null;
   if (!job) notFound();
 
-  // Owner edits all; a salesman edits only their OWN jobs. A salesman viewing
-  // another member's job gets the read-only in-depth view.
-  const canEdit = ctx.isOwner || job.salesman_member_id === ctx.member.id;
+  // Every member is READ-ONLY on jobs they don't own — the owner included (R2:
+  // honors the read-only team roll-up, ROADMAP §4 / AGENTS §9). You edit only the
+  // jobs you own; the owner also owns legacy null-salesman jobs. Anyone viewing a
+  // job they don't own gets the read-only in-depth view.
+  const canEdit =
+    job.salesman_member_id === ctx.member.id ||
+    (ctx.isOwner && !job.salesman_member_id);
 
   const { data: phasesData } = await supabase
     .from("phases")
@@ -45,6 +50,10 @@ export default async function JobBoardPage({
     .eq("job_id", id)
     .order("sequence_index", { ascending: true });
   const phases = (phasesData ?? []) as Phase[];
+
+  // M17: notes for every phase, author resolved + per-note canEdit precomputed for
+  // this viewer (only their own member notes are editable — mirrors RLS).
+  const notesByPhase = await notesForJob(job.id, job.org_id, ctx.member.id);
 
   // Crew rows carry the secret invite_token. The owner / owning salesman read
   // them (RLS-allowed) to manage links; a read-only viewer gets assignee NAMES
@@ -82,6 +91,7 @@ export default async function JobBoardPage({
       <RealtimeRefresh
         channelName={`phases-job-${job.id}`}
         filter={`job_id=eq.${job.id}`}
+        tables={["phases", "notes"]}
       />
       <header>
         <div className="flex items-center justify-between">
@@ -135,6 +145,7 @@ export default async function JobBoardPage({
         jobId={job.id}
         phases={phases}
         participants={assignees}
+        notesByPhase={notesByPhase}
         readOnly={!canEdit}
       />
 

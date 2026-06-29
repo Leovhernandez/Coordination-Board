@@ -6,6 +6,7 @@ import {
   participantCookieName,
 } from "@/lib/participant";
 import { BroadcastRefresh } from "@/components/BroadcastRefresh";
+import { notesForParticipant } from "@/lib/notes";
 import { getDictionary } from "@/lib/i18n/server";
 import { ParticipantBoard } from "./ParticipantBoard";
 import type { Phase } from "@/lib/types";
@@ -46,7 +47,7 @@ export default async function ParticipantPage({
   const supabase = createServiceClient();
   const { data: job } = await supabase
     .from("jobs")
-    .select("id, name")
+    .select("id, name, org_id")
     .eq("id", jobId)
     .maybeSingle();
   // Only this participant's assigned phases ever leave the server.
@@ -58,6 +59,17 @@ export default async function ParticipantPage({
     .order("sequence_index", { ascending: true });
   const myPhases = (phasesData ?? []) as Phase[];
 
+  // M17: notes on this crew's assigned phases — member notes + their own crew
+  // notes only (never another crew's), scoped to the assigned phase ids.
+  const notesByPhase = job
+    ? await notesForParticipant(
+        jobId,
+        job.org_id,
+        participant.id,
+        myPhases.map((p) => p.id),
+      )
+    : {};
+
   return (
     <>
       <BroadcastRefresh jobId={jobId} />
@@ -67,6 +79,7 @@ export default async function ParticipantPage({
         jobName={job?.name ?? t.participant.jobFallback}
         participantName={participant.name}
         phases={myPhases}
+        notesByPhase={notesByPhase}
       />
     </>
   );

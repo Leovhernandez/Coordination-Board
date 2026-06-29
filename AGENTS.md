@@ -106,8 +106,16 @@ gated behind a pricing tier (see `docs/ROADMAP-AND-PRICING.md`).
 - **Owner roll-up grid (Base).** A read-only, glanceable grid of each salesman's
   live job headlines. **Not** analytics/charts — relaxes "no multi-job analytics"
   only to a roll-up of the same one-line headlines the dashboard already shows.
+  **Write boundary (R2, 2026-06-29):** every member is **read-only on jobs they
+  don't own — the owner included.** You edit only the jobs you own (the owner also
+  owns legacy null-salesman jobs); everyone reads all org jobs (M-VIS). The roll-up
+  and the read-only in-depth view never expose write controls for others' jobs.
 - **Phase notes (Base).** Small structured notes per phase (e.g. gate/lockbox
   codes), visible to GC and assigned crew. **Not** chat — no threaded reply UI.
+  **Shipped (M17):** two-sided author (member or crew); every member reads all org
+  notes but edits only their **own**; crew read member notes + their own, limited
+  to their **assigned** phases. Live-refreshes (`notes` published + REPLICA
+  IDENTITY FULL so deletes propagate).
 - **Activity log + blocker duration (Base).** Timestamped record of status/note
   changes; "how long blocked" derived from it.
 - **Insurance attestation + preferred payment method (Base).** Light crew-side

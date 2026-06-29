@@ -253,6 +253,18 @@ export const en = {
     present: "present",
     missing: "missing",
   },
+
+  notes: {
+    add: "Add note",
+    placeholder: "Gate code, lockbox, access info…",
+    save: "Save",
+    cancel: "Cancel",
+    edit: "Edit",
+    delete: "Delete",
+    deleteConfirm: "Delete this note?",
+    crewTag: "crew",
+    edited: "edited",
+  },
 };
 
 // No `as const`: leaf types widen to `string`, so `Dict` enforces that `es` has
@@ -510,6 +522,18 @@ export const es: Dict = {
       "La app está funcionando, pero faltan algunas variables de entorno. Copia .env.local.example a .env.local y complétalas.",
     present: "presente",
     missing: "faltante",
+  },
+
+  notes: {
+    add: "Agregar nota",
+    placeholder: "Código de reja, caja de llaves, acceso…",
+    save: "Guardar",
+    cancel: "Cancelar",
+    edit: "Editar",
+    delete: "Eliminar",
+    deleteConfirm: "¿Eliminar esta nota?",
+    crewTag: "cuadrilla",
+    edited: "editado",
   },
 };
 

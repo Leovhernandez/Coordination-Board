@@ -40,7 +40,7 @@ export function MemberName({ name }: { name: string }) {
         inputMode="text"
         placeholder={t.dashboard.yourName}
         aria-label={t.dashboard.yourName}
-        className="w-full rounded-lg border border-slate-300 px-2 py-1 text-2xl font-bold tracking-tight text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+        className="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1 text-2xl font-bold tracking-tight text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
       />
     );
   }
@@ -52,12 +52,12 @@ export function MemberName({ name }: { name: string }) {
         setDraft(name);
         setEditing(true);
       }}
-      className="group flex items-center gap-1.5 text-left"
+      className="group flex min-w-0 max-w-full items-center gap-1.5 text-left"
     >
-      <span className="text-2xl font-bold tracking-tight text-slate-900">
+      <span className="truncate text-2xl font-bold tracking-tight text-slate-900">
         {name}
       </span>
-      <span className="text-sm text-slate-300 group-active:text-slate-500">
+      <span className="shrink-0 text-sm text-slate-300 group-active:text-slate-500">
         ✎
       </span>
     </button>

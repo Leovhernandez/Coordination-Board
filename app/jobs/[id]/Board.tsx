@@ -1,16 +1,20 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import type { Phase, PhaseStatus } from "@/lib/types";
+import type { NoteView, Phase, PhaseStatus } from "@/lib/types";
 import { STATUS_ACCENT, STATUS_ACTIVE, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
+import { PhaseNotes } from "@/components/PhaseNotes";
 import { useT } from "@/components/I18nProvider";
 import { interpolate } from "@/lib/i18n/interpolate";
 import {
+  addNote,
   addPhase,
   assignPhase,
+  deleteNote,
   deletePhase,
+  editNote,
   movePhase,
   renamePhase,
   setPhaseStatus,
@@ -31,11 +35,14 @@ export function Board({
   jobId,
   phases,
   participants,
+  notesByPhase = {},
   readOnly = false,
 }: {
   jobId: string;
   phases: Phase[];
   participants: CrewOption[];
+  /** M17: notes per phase id, author resolved + canEdit precomputed server-side. */
+  notesByPhase?: Record<string, NoteView[]>;
   /** M-DASH: a member viewing another member's job sees phases + statuses +
    *  headline but NO write controls (no status buttons, no Edit phases). The
    *  SAME component renders both so they can't drift. */
@@ -266,6 +273,15 @@ export function Board({
                     </p>
                   )
                 )}
+
+                <PhaseNotes
+                  phaseId={p.id}
+                  notes={notesByPhase[p.id] ?? []}
+                  canAdd={!readOnly}
+                  onAdd={(phaseId, body) => addNote(jobId, phaseId, body)}
+                  onEdit={(noteId, body) => editNote(noteId, jobId, body)}
+                  onDelete={(noteId) => deleteNote(noteId, jobId)}
+                />
               </>
             )}
           </div>

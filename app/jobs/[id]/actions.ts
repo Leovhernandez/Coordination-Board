@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionContext } from "@/lib/membership";
 import { broadcastJobChange } from "@/lib/realtime";
 import type { PhaseStatus } from "@/lib/types";
 
@@ -187,6 +188,53 @@ export async function assignPhase(
     .from("phases")
     .update({ assignee_participant_id: participantId })
     .eq("id", phaseId);
+  await revalidateJob(jobId);
+}
+
+// --- Phase notes (M17) ---
+
+/**
+ * Adds a member note to a phase. author_member_id is set to the caller's own
+ * membership; RLS (with check owns_member AND can_access_job) guarantees a member
+ * can only author their OWN note on a job they can edit — a read-only viewer's
+ * insert fails the policy and is a no-op.
+ */
+export async function addNote(jobId: string, phaseId: string, body: string) {
+  const text = body.trim();
+  if (!text) return;
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("notes").insert({
+    phase_id: phaseId,
+    job_id: jobId,
+    author_member_id: ctx.member.id,
+    body: text,
+  });
+  if (error) return;
+  await revalidateJob(jobId);
+}
+
+/** Edits a member's OWN note. RLS (owns_member) limits this to the author — an
+ *  attempt on another's note updates 0 rows (no-op). */
+export async function editNote(noteId: string, jobId: string, body: string) {
+  const text = body.trim();
+  if (!text) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("notes")
+    .update({ body: text, updated_at: new Date().toISOString() })
+    .eq("id", noteId);
+  if (error) return;
+  await revalidateJob(jobId);
+}
+
+/** Deletes a member's OWN note (RLS owns_member; no-op on another's note). */
+export async function deleteNote(noteId: string, jobId: string) {
+  const supabase = await createClient();
+  await supabase.from("notes").delete().eq("id", noteId);
   await revalidateJob(jobId);
 }
 

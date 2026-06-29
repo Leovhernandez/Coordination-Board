@@ -1,12 +1,18 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import type { Phase, PhaseStatus } from "@/lib/types";
+import type { NoteView, Phase, PhaseStatus } from "@/lib/types";
 import { STATUS_ACCENT, STATUS_ACTIVE, STATUS_PILL } from "@/lib/status";
 import { useT } from "@/components/I18nProvider";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { LangToggle } from "@/components/LangToggle";
-import { updateAssignedPhase } from "./actions";
+import { PhaseNotes } from "@/components/PhaseNotes";
+import {
+  addCrewNote,
+  deleteCrewNote,
+  editCrewNote,
+  updateAssignedPhase,
+} from "./actions";
 
 type OptimisticUpdate = {
   id: string;
@@ -26,11 +32,14 @@ export function ParticipantBoard({
   jobName,
   participantName,
   phases,
+  notesByPhase = {},
 }: {
   jobId: string;
   jobName: string;
   participantName: string;
   phases: Phase[];
+  /** M17: notes on this crew's assigned phases (member notes + their own). */
+  notesByPhase?: Record<string, NoteView[]>;
 }) {
   const t = useT();
   const [, startTransition] = useTransition();
@@ -164,6 +173,15 @@ export function ParticipantBoard({
                     </p>
                   )
                 )}
+
+                <PhaseNotes
+                  phaseId={p.id}
+                  notes={notesByPhase[p.id] ?? []}
+                  canAdd
+                  onAdd={(phaseId, body) => addCrewNote(jobId, phaseId, body)}
+                  onEdit={(noteId, body) => editCrewNote(jobId, noteId, body)}
+                  onDelete={(noteId) => deleteCrewNote(jobId, noteId)}
+                />
               </div>
             </div>
           ))}

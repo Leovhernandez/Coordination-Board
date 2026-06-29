@@ -150,7 +150,7 @@ export default async function DashboardPage({
         tables={["phases", "jobs", "org_members"]}
       />
       <header className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {isOwner ? (
             <OrgName name={org.name} />
           ) : (

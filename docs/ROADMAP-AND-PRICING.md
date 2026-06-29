@@ -45,17 +45,19 @@ are reflected in the constitution at `AGENTS.md` §9.
 | **M14** | **Multi-seat orgs** (owner + salesmen, shared crew, one subscription) | Base | **Foundational spine.** Schema change. See §3. |
 | **M15** | **Owner roll-up grid** (per-salesman job shelves) | Base | Depends on M14. Design locked in §4. |
 | **M16** | **Admin: companies + emails + seat/usage counts** | internal | Extends `/admin`. Needs M14. |
-| **M17** | **Phase notes** (gate/lockbox codes) | Base | Cheap, high daily value. Not chat. |
-| **M18** | **Activity log + blocker duration** | Base | Timestamped; "how long blocked." |
+| **M17** | **Phase notes** (gate/lockbox codes) | Base | ✅ **Done** (two-sided author, RLS matrix, live-refresh). |
+| **M10** | **Soft-delete + restore + purge** (jobs) | Base | **Scheduled** (promoted from M17 R3: jobs archive but can't delete). |
+| **M18** | **Activity log + blocker duration** | Base | Timestamped; "how long blocked." **Next.** |
 | **M19** | **Auto-assign sole subcontractor** | Base | Small, pure logic. |
 | **M20** | **Insurance attestation checkbox** | Base | Stores exact text + identity + timestamp. Reuses App 2 signature tech. |
 | **M21** | **Preferred payment method** (crew field) | Base | Minor; can fold into M17/M20. |
 | **M22** | **Photo uploads** (Blocked/Done/In-progress) | **Pro** | Cloudflare R2 + compression + per-org cap. |
 | **M23** | **Incentive scoreboard** | **Pro** | Validate with Trinity first. |
 
-**Also still relevant from earlier backlog:** M10 soft-delete+restore+purge, M11
-phase deadlines, M12 owner email alerts (Resend). **M13 Spanish/English UI** —
-✅ **Done** (full-app EN/ES toggle + auto-detect, display-only; emails included).
+**Also still relevant from earlier backlog:** M11 phase deadlines, M12 owner email
+alerts (Resend). **M10 soft-delete + restore + purge** is now **scheduled** (see
+table; promoted from M17 R3). **M13 Spanish/English UI** — ✅ **Done** (full-app
+EN/ES toggle + auto-detect, display-only; emails included).
 
 ### Deferred / cut
 - **Master files / invoices per house** → Enterprise only, unvalidated; it's a
