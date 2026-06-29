@@ -46,8 +46,8 @@ are reflected in the constitution at `AGENTS.md` §9.
 | **M15** | **Owner roll-up grid** (per-salesman job shelves) | Base | Depends on M14. Design locked in §4. |
 | **M16** | **Admin: companies + emails + seat/usage counts** | internal | Extends `/admin`. Needs M14. |
 | **M17** | **Phase notes** (gate/lockbox codes) | Base | ✅ **Done** (two-sided author, RLS matrix, live-refresh). |
-| **M10** | **Soft-delete + restore + purge** (jobs) | Base | **Scheduled** (promoted from M17 R3: jobs archive but can't delete). |
-| **M18** | **Activity log + blocker duration** | Base | Timestamped; "how long blocked." **Next.** |
+| **M10** | **Soft-delete + restore + purge** (jobs) | Base | **Next.** (promoted from M17 R3: jobs archive but can't delete). |
+| **M18** | **Activity log + blocker duration** | Base | ✅ **Done** (append-only activity_log, two-sided actor, per-phase History + "Blocked Nd" pill, live-refresh). |
 | **M19** | **Auto-assign sole subcontractor** | Base | Small, pure logic. |
 | **M20** | **Insurance attestation checkbox** | Base | Stores exact text + identity + timestamp. Reuses App 2 signature tech. |
 | **M21** | **Preferred payment method** (crew field) | Base | Minor; can fold into M17/M20. |

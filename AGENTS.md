@@ -117,7 +117,13 @@ gated behind a pricing tier (see `docs/ROADMAP-AND-PRICING.md`).
   to their **assigned** phases. Live-refreshes (`notes` published + REPLICA
   IDENTITY FULL so deletes propagate).
 - **Activity log + blocker duration (Base).** Timestamped record of status/note
-  changes; "how long blocked" derived from it.
+  changes; "how long blocked" derived from it. **Shipped (M18):** append-only
+  `activity_log` with a two-sided actor (member or crew); members read org-wide,
+  but writes are server-only via the service role (members are SELECT-only — an
+  append fails `42501` at the privilege layer). Surfaced as a collapsed-by-default
+  per-phase **History** disclosure + a "Blocked Nd" duration pill — no global feed
+  (§7); the crew board omits History. Live-refreshes (`activity_log` published so
+  the log's own insert drives the refresh, sidestepping a commit-ordering race).
 - **Insurance attestation + preferred payment method (Base).** Light crew-side
   fields; attestation stores exact agreed text + identity + timestamp.
 - **Photo uploads on Blocked/Done/In-progress (Pro).** Status-evidence photos
