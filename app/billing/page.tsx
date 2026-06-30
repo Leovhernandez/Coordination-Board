@@ -76,6 +76,19 @@ export default async function BillingPage() {
           )}
         </section>
       )}
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900">
+          {t.billing.exportTitle}
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">{t.billing.exportDesc}</p>
+        <a
+          href="/billing/export"
+          className="mt-3 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-center text-base font-semibold text-slate-900 active:bg-slate-100"
+        >
+          {t.billing.exportButton}
+        </a>
+      </section>
     </main>
   );
 }

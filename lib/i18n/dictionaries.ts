@@ -186,6 +186,10 @@ export const en = {
     ownerOnly: "Owner-only — subcontractors never see billing.",
     manage: "Manage billing",
     subscribe: "Subscribe",
+    exportTitle: "Export your data",
+    exportDesc:
+      "Download all your jobs, phases, notes, and activity as CSV files in a ZIP.",
+    exportButton: "Export data (.zip)",
   },
 
   email: {
@@ -495,6 +499,10 @@ export const es: Dict = {
     ownerOnly: "Solo para el dueño — los subcontratistas nunca ven la facturación.",
     manage: "Administrar facturación",
     subscribe: "Suscribirse",
+    exportTitle: "Exporta tus datos",
+    exportDesc:
+      "Descarga todos tus trabajos, fases, notas y actividad como archivos CSV en un ZIP.",
+    exportButton: "Exportar datos (.zip)",
   },
 
   email: {
