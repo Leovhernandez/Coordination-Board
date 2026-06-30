@@ -25,4 +25,4 @@ See [`.env.local.example`](./.env.local.example). The `SUPABASE_SERVICE_ROLE_KEY
 
 Tracked in [`BUILD-PROMPT.md`](./BUILD-PROMPT.md): M0 scaffold/deploy → M1 schema → M2 owner auth + jobs → M3 board → M4 critical-path headline → M5 link invite → M6 realtime → M7 PWA → M8 billing → M9 pilot.
 
-Post-v1 (Trinity-driven, see [`docs/ROADMAP-AND-PRICING.md`](./docs/ROADMAP-AND-PRICING.md)): M14 multi-seat orgs → M-VIS company-wide read-only visibility → M-DASH symmetric dashboard → M13 Spanish/English UI (display-only) → M17 phase notes → M18 activity log + blocker duration.
+Post-v1 (Trinity-driven, see [`docs/ROADMAP-AND-PRICING.md`](./docs/ROADMAP-AND-PRICING.md)): M14 multi-seat orgs → M-VIS company-wide read-only visibility → M-DASH symmetric dashboard → M13 Spanish/English UI (display-only) → M17 phase notes → M18 activity log + blocker duration → M10 soft-delete/restore/purge → M22 photo uploads (Cloudflare R2; Base+Pro storage cap).

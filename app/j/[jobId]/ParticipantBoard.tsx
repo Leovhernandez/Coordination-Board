@@ -1,14 +1,17 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import type { NoteView, Phase, PhaseStatus } from "@/lib/types";
+import type { NoteView, Phase, PhaseStatus, PhotoView } from "@/lib/types";
 import { STATUS_ACCENT, STATUS_ACTIVE, STATUS_PILL } from "@/lib/status";
 import { useT } from "@/components/I18nProvider";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { LangToggle } from "@/components/LangToggle";
 import { PhaseNotes } from "@/components/PhaseNotes";
+import { PhasePhotos } from "@/components/PhasePhotos";
 import {
   addCrewNote,
+  confirmCrewUpload,
+  createCrewUploadUrl,
   deleteCrewNote,
   editCrewNote,
   updateAssignedPhase,
@@ -33,6 +36,7 @@ export function ParticipantBoard({
   participantName,
   phases,
   notesByPhase = {},
+  photosByPhase = {},
 }: {
   jobId: string;
   jobName: string;
@@ -40,6 +44,8 @@ export function ParticipantBoard({
   phases: Phase[];
   /** M17: notes on this crew's assigned phases (member notes + their own). */
   notesByPhase?: Record<string, NoteView[]>;
+  /** M22: status-evidence photos on assigned phases (member photos + their own). */
+  photosByPhase?: Record<string, PhotoView[]>;
 }) {
   const t = useT();
   const [, startTransition] = useTransition();
@@ -181,6 +187,17 @@ export function ParticipantBoard({
                   onAdd={(phaseId, body) => addCrewNote(jobId, phaseId, body)}
                   onEdit={(noteId, body) => editCrewNote(jobId, noteId, body)}
                   onDelete={(noteId) => deleteCrewNote(jobId, noteId)}
+                />
+
+                <PhasePhotos
+                  phaseId={p.id}
+                  statusContext={p.status === "not_started" ? null : p.status}
+                  photos={photosByPhase[p.id] ?? []}
+                  canAdd
+                  onCreateUploadUrl={(input) =>
+                    createCrewUploadUrl({ jobId, ...input })
+                  }
+                  onConfirm={(input) => confirmCrewUpload({ jobId, ...input })}
                 />
               </div>
             </div>

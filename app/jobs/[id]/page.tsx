@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { participantLink } from "@/lib/participant";
 import { notesForJob } from "@/lib/notes";
 import { activityForJob } from "@/lib/activity";
+import { photosForJob } from "@/lib/photos";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { getDictionary } from "@/lib/i18n/server";
 import { Board } from "./Board";
@@ -63,6 +64,10 @@ export default async function JobBoardPage({
   // board and the read-only in-depth view.
   const activityByPhase = await activityForJob(job.id, job.org_id);
 
+  // M22: status-evidence photos per phase (CDN urls + uploader resolved). Members
+  // read org-wide; display-only on both the editable board and read-only view.
+  const photosByPhase = await photosForJob(job.id, job.org_id);
+
   // Crew rows carry the secret invite_token. The owner / owning salesman read
   // them (RLS-allowed) to manage links; a read-only viewer gets assignee NAMES
   // ONLY, resolved server-side via the service client — never a token (§5).
@@ -99,7 +104,7 @@ export default async function JobBoardPage({
       <RealtimeRefresh
         channelName={`phases-job-${job.id}`}
         filter={`job_id=eq.${job.id}`}
-        tables={["phases", "notes", "activity_log"]}
+        tables={["phases", "notes", "activity_log", "photos"]}
       />
       <header>
         <div className="flex items-center justify-between">
@@ -162,6 +167,7 @@ export default async function JobBoardPage({
         participants={assignees}
         notesByPhase={notesByPhase}
         activityByPhase={activityByPhase}
+        photosByPhase={photosByPhase}
         readOnly={!canEdit}
       />
 

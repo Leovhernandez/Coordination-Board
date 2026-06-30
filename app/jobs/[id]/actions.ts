@@ -1,13 +1,34 @@
 "use server";
 
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getSessionContext } from "@/lib/membership";
 import { broadcastJobChange } from "@/lib/realtime";
 import { logActivity } from "@/lib/activity";
-import type { PhaseStatus } from "@/lib/types";
+import {
+  deleteByPrefix,
+  deleteObjects,
+  headObjectSize,
+  isR2Configured,
+  presignPutUrl,
+} from "@/lib/r2";
+import {
+  isAllowedImageType,
+  MAX_PHOTO_BYTES,
+  MAX_PHOTOS_PER_PHASE,
+  storageCapBytes,
+} from "@/lib/capabilities";
+import { orgStorageUsedBytes } from "@/lib/photos";
+import type {
+  ConfirmUploadInput,
+  ConfirmUploadResult,
+  CreateUploadInput,
+  CreateUploadResult,
+  PhaseStatus,
+} from "@/lib/types";
 
 async function revalidateJob(jobId: string) {
   revalidatePath(`/jobs/${jobId}`);
@@ -414,6 +435,146 @@ export async function deleteNote(noteId: string, jobId: string) {
   await revalidateJob(jobId);
 }
 
+// --- Photos (M22) ---
+//
+// Writes are SERVER-ONLY (photos has no authenticated write grant), so these
+// actions ARE the authorization: a member may upload only on a job they can EDIT
+// (their own, or the owner on a legacy null-salesman job) — mirroring purgeJob's
+// canEdit gate. The org cap + MIME + size are re-checked here; client checks are
+// advisory (AGENTS §5). Bytes go browser→R2 via the presigned PUT — never here.
+
+async function memberJobForWrite(jobId: string) {
+  const ctx = await getSessionContext();
+  if (!ctx) return null;
+  const supabase = await createClient();
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("id, org_id, salesman_member_id, deleted_at")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job || job.deleted_at) return null;
+  const canEdit =
+    job.salesman_member_id === ctx.member.id ||
+    (ctx.isOwner && !job.salesman_member_id);
+  if (!canEdit) return null;
+  return { ctx, orgId: job.org_id as string };
+}
+
+/** Presign a browser→R2 upload after validating actor + MIME + size + count + cap. */
+export async function createUploadUrl(
+  input: CreateUploadInput & { jobId: string },
+): Promise<CreateUploadResult> {
+  if (!isR2Configured()) return { ok: false, error: "config" };
+  const { jobId, phaseId, contentType, byteSize } = input;
+  const found = await memberJobForWrite(jobId);
+  if (!found) return { ok: false, error: "auth" };
+  const { ctx, orgId } = found;
+
+  if (!isAllowedImageType(contentType)) return { ok: false, error: "type" };
+  if (!(byteSize > 0) || byteSize > MAX_PHOTO_BYTES) {
+    return { ok: false, error: "size" };
+  }
+
+  const svc = createServiceClient();
+  const { data: phase } = await svc
+    .from("phases")
+    .select("id, job_id")
+    .eq("id", phaseId)
+    .maybeSingle();
+  if (!phase || phase.job_id !== jobId) return { ok: false, error: "phase" };
+
+  const { count } = await svc
+    .from("photos")
+    .select("id", { count: "exact", head: true })
+    .eq("phase_id", phaseId);
+  if ((count ?? 0) >= MAX_PHOTOS_PER_PHASE) return { ok: false, error: "count" };
+
+  const used = await orgStorageUsedBytes(orgId);
+  if (used + byteSize > storageCapBytes(ctx.org)) return { ok: false, error: "cap" };
+
+  const uuid = randomUUID();
+  const key = `org/${orgId}/job/${jobId}/${uuid}.jpg`;
+  const thumbKey = `org/${orgId}/job/${jobId}/${uuid}_thumb.jpg`;
+  const [uploadUrl, thumbUploadUrl] = await Promise.all([
+    presignPutUrl(key, contentType),
+    presignPutUrl(thumbKey, contentType),
+  ]);
+  return { ok: true, key, thumbKey, uploadUrl, thumbUploadUrl };
+}
+
+/** Record the metadata after the browser PUT, re-checking everything authoritatively. */
+export async function confirmUpload(
+  input: ConfirmUploadInput & { jobId: string },
+): Promise<ConfirmUploadResult> {
+  const { jobId, phaseId, statusContext, key, thumbKey, contentType, width, height } =
+    input;
+  const found = await memberJobForWrite(jobId);
+  if (!found) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "auth" };
+  }
+  const { ctx, orgId } = found;
+
+  // The key MUST live under this org/job — a client can't point a row at another
+  // org's object.
+  const prefix = `org/${orgId}/job/${jobId}/`;
+  if (!key.startsWith(prefix) || (thumbKey && !thumbKey.startsWith(prefix))) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "auth" };
+  }
+
+  const svc = createServiceClient();
+  const { data: phase } = await svc
+    .from("phases")
+    .select("id, job_id")
+    .eq("id", phaseId)
+    .maybeSingle();
+  if (!phase || phase.job_id !== jobId) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "phase" };
+  }
+
+  // Authoritative size from R2 (defeats an under-declared byteSize).
+  const size = await headObjectSize(key);
+  if (size == null || size <= 0 || size > MAX_PHOTO_BYTES) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "size" };
+  }
+  // Re-check cap + per-phase count with the REAL size (a racing upload counts).
+  if ((await orgStorageUsedBytes(orgId)) + size > storageCapBytes(ctx.org)) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "cap" };
+  }
+  const { count } = await svc
+    .from("photos")
+    .select("id", { count: "exact", head: true })
+    .eq("phase_id", phaseId);
+  if ((count ?? 0) >= MAX_PHOTOS_PER_PHASE) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "count" };
+  }
+
+  const { error } = await svc.from("photos").insert({
+    job_id: jobId,
+    phase_id: phaseId,
+    org_id: orgId,
+    status_context: statusContext,
+    uploaded_by_member_id: ctx.member.id,
+    r2_key: key,
+    thumb_key: thumbKey || null,
+    content_type: contentType,
+    byte_size: size,
+    width,
+    height,
+  });
+  if (error) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "config" };
+  }
+  await revalidateJob(jobId);
+  return { ok: true };
+}
+
 // --- Archive ---
 
 /** Archives a job (leaves the active list) and returns to the dashboard. */
@@ -474,7 +635,7 @@ export async function purgeJob(jobId: string) {
   const supabase = await createClient();
   const { data: job } = await supabase
     .from("jobs")
-    .select("salesman_member_id")
+    .select("salesman_member_id, org_id")
     .eq("id", jobId)
     .maybeSingle();
   if (!job) return;
@@ -483,5 +644,15 @@ export async function purgeJob(jobId: string) {
     (ctx.isOwner && !job.salesman_member_id);
   if (!canEdit) return;
   await supabase.from("jobs").delete().eq("id", jobId);
+  // Free the job's R2 photos (the rows already cascade-deleted via job_id). M22.
+  // Best-effort: a failure here leaves objects a prefix sweep can reclaim, but must
+  // never block the purge.
+  try {
+    if (isR2Configured() && job.org_id) {
+      await deleteByPrefix(`org/${job.org_id}/job/${jobId}/`);
+    }
+  } catch {
+    // swallow — purge already committed; orphaned objects are reclaimable by prefix
+  }
   revalidatePath("/dashboard");
 }

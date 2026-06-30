@@ -15,6 +15,10 @@ export type Organization = {
   trial_ends_at: string | null;
   // M14: max salesmen the owner may invite (admin-adjustable per business).
   salesman_seat_limit: number;
+  // M22: capability tier + photo storage cap. `plan` defaults to 'base'; the cap is
+  // derived from plan unless storage_cap_bytes overrides it (lib/capabilities.ts).
+  plan: string;
+  storage_cap_bytes: number | null;
 };
 
 export type Job = {
@@ -120,3 +124,80 @@ export type ActivityView = {
   detail: Record<string, unknown>;
   createdAt: string;
 };
+
+// M22: a status-evidence photo on a phase. Bytes live on R2; this row is the
+// metadata + R2 keys. Two-sided uploader (member XOR crew, lenient like
+// activity_log so a deleted uploader doesn't orphan-delete the row).
+export type StatusContext = "blocked" | "done" | "in_progress";
+
+export type Photo = {
+  id: string;
+  job_id: string;
+  phase_id: string | null;
+  org_id: string;
+  status_context: StatusContext;
+  uploaded_by_member_id: string | null;
+  uploaded_by_participant_id: string | null;
+  r2_key: string;
+  thumb_key: string | null;
+  content_type: string;
+  byte_size: number;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+};
+
+// A photo shaped for display: CDN urls built + uploader resolved to a name/side.
+export type PhotoView = {
+  id: string;
+  phaseId: string | null;
+  url: string;
+  thumbUrl: string;
+  uploaderName: string;
+  uploaderType: "member" | "crew" | "system";
+  statusContext: StatusContext;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
+};
+
+// Upload action I/O — shared by the member + crew actions and the PhasePhotos UI.
+export type PhotoUploadError =
+  | "auth"
+  | "type"
+  | "size"
+  | "count"
+  | "cap"
+  | "config"
+  | "phase";
+
+export type CreateUploadInput = {
+  phaseId: string;
+  statusContext: StatusContext;
+  contentType: string;
+  byteSize: number;
+};
+
+export type CreateUploadResult =
+  | {
+      ok: true;
+      key: string;
+      thumbKey: string;
+      uploadUrl: string;
+      thumbUploadUrl: string;
+    }
+  | { ok: false; error: PhotoUploadError };
+
+export type ConfirmUploadInput = {
+  phaseId: string;
+  statusContext: StatusContext;
+  key: string;
+  thumbKey: string;
+  contentType: string;
+  width: number | null;
+  height: number | null;
+};
+
+export type ConfirmUploadResult =
+  | { ok: true }
+  | { ok: false; error: PhotoUploadError };

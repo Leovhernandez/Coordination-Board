@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -9,7 +10,26 @@ import {
 } from "@/lib/participant";
 import { broadcastJobChange } from "@/lib/realtime";
 import { logActivity } from "@/lib/activity";
-import type { PhaseStatus } from "@/lib/types";
+import {
+  deleteObjects,
+  headObjectSize,
+  isR2Configured,
+  presignPutUrl,
+} from "@/lib/r2";
+import {
+  isAllowedImageType,
+  MAX_PHOTO_BYTES,
+  MAX_PHOTOS_PER_PHASE,
+  storageCapBytes,
+} from "@/lib/capabilities";
+import { orgStorageUsedBytes } from "@/lib/photos";
+import type {
+  ConfirmUploadInput,
+  ConfirmUploadResult,
+  CreateUploadInput,
+  CreateUploadResult,
+  PhaseStatus,
+} from "@/lib/types";
 
 /** Refresh every surface a crew action touches: the crew board, the owner/salesman
  *  job board + dashboard (postgres_changes also covers them), and broadcast so
@@ -196,4 +216,134 @@ export async function deleteCrewNote(jobId: string, noteId: string) {
     actorParticipantId: participant.id,
   });
   await revalidateCrew(jobId);
+}
+
+// --- Photos (M22, crew side) ---
+//
+// Same token-scoped enforcement as updateAssignedPhase: validate token ->
+// participant, confirm the phase is ASSIGNED to this participant, then write via
+// the service role (crew are not auth users). MIME + size + per-phase count + the
+// org cap are re-checked server-side. Bytes go browser->R2; this never touches them.
+
+async function crewPhaseForWrite(jobId: string, phaseId: string) {
+  const token = (await cookies()).get(participantCookieName(jobId))?.value;
+  const participant = await getParticipantByToken(jobId, token);
+  if (!participant) return null;
+  const supabase = createServiceClient();
+  const { data: phase } = await supabase
+    .from("phases")
+    .select("id, job_id, assignee_participant_id")
+    .eq("id", phaseId)
+    .maybeSingle();
+  if (
+    !phase ||
+    phase.job_id !== jobId ||
+    phase.assignee_participant_id !== participant.id
+  ) {
+    return null; // not this participant's phase
+  }
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("id, org_id, deleted_at")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job || job.deleted_at) return null;
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan, storage_cap_bytes")
+    .eq("id", job.org_id)
+    .maybeSingle();
+  if (!org) return null;
+  return { participant, supabase, orgId: job.org_id as string, org };
+}
+
+export async function createCrewUploadUrl(
+  input: CreateUploadInput & { jobId: string },
+): Promise<CreateUploadResult> {
+  if (!isR2Configured()) return { ok: false, error: "config" };
+  const { jobId, phaseId, contentType, byteSize } = input;
+  const found = await crewPhaseForWrite(jobId, phaseId);
+  if (!found) return { ok: false, error: "auth" };
+  const { supabase, orgId, org } = found;
+
+  if (!isAllowedImageType(contentType)) return { ok: false, error: "type" };
+  if (!(byteSize > 0) || byteSize > MAX_PHOTO_BYTES) {
+    return { ok: false, error: "size" };
+  }
+
+  const { count } = await supabase
+    .from("photos")
+    .select("id", { count: "exact", head: true })
+    .eq("phase_id", phaseId);
+  if ((count ?? 0) >= MAX_PHOTOS_PER_PHASE) return { ok: false, error: "count" };
+
+  if ((await orgStorageUsedBytes(orgId)) + byteSize > storageCapBytes(org)) {
+    return { ok: false, error: "cap" };
+  }
+
+  const uuid = randomUUID();
+  const key = `org/${orgId}/job/${jobId}/${uuid}.jpg`;
+  const thumbKey = `org/${orgId}/job/${jobId}/${uuid}_thumb.jpg`;
+  const [uploadUrl, thumbUploadUrl] = await Promise.all([
+    presignPutUrl(key, contentType),
+    presignPutUrl(thumbKey, contentType),
+  ]);
+  return { ok: true, key, thumbKey, uploadUrl, thumbUploadUrl };
+}
+
+export async function confirmCrewUpload(
+  input: ConfirmUploadInput & { jobId: string },
+): Promise<ConfirmUploadResult> {
+  const { jobId, phaseId, statusContext, key, thumbKey, contentType, width, height } =
+    input;
+  const found = await crewPhaseForWrite(jobId, phaseId);
+  if (!found) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "auth" };
+  }
+  const { participant, supabase, orgId, org } = found;
+
+  const prefix = `org/${orgId}/job/${jobId}/`;
+  if (!key.startsWith(prefix) || (thumbKey && !thumbKey.startsWith(prefix))) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "auth" };
+  }
+
+  const size = await headObjectSize(key);
+  if (size == null || size <= 0 || size > MAX_PHOTO_BYTES) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "size" };
+  }
+  if ((await orgStorageUsedBytes(orgId)) + size > storageCapBytes(org)) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "cap" };
+  }
+  const { count } = await supabase
+    .from("photos")
+    .select("id", { count: "exact", head: true })
+    .eq("phase_id", phaseId);
+  if ((count ?? 0) >= MAX_PHOTOS_PER_PHASE) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "count" };
+  }
+
+  const { error } = await supabase.from("photos").insert({
+    job_id: jobId,
+    phase_id: phaseId,
+    org_id: orgId,
+    status_context: statusContext,
+    uploaded_by_participant_id: participant.id,
+    r2_key: key,
+    thumb_key: thumbKey || null,
+    content_type: contentType,
+    byte_size: size,
+    width,
+    height,
+  });
+  if (error) {
+    await deleteObjects([key, thumbKey]);
+    return { ok: false, error: "config" };
+  }
+  await revalidateCrew(jobId);
+  return { ok: true };
 }

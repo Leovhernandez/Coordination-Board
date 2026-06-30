@@ -271,6 +271,18 @@ export const en = {
     edited: "edited",
   },
 
+  photos: {
+    add: "Add photo",
+    uploading: "Uploading…",
+    capReached: "Storage is full — upgrade to Pro for more photo storage.",
+    tooLarge: "That image is too large.",
+    badType: "Only image files can be uploaded.",
+    tooMany: "Photo limit reached for this phase.",
+    failed: "Upload failed — check your signal and try again.",
+    photoAlt: "Status photo",
+    crewTag: "crew",
+  },
+
   history: {
     toggle: "History ({n})",
     statusSet: "{actor} set {status}",
@@ -568,6 +580,19 @@ export const es: Dict = {
     deleteConfirm: "¿Eliminar esta nota?",
     crewTag: "cuadrilla",
     edited: "editado",
+  },
+
+  photos: {
+    add: "Agregar foto",
+    uploading: "Subiendo…",
+    capReached:
+      "El almacenamiento está lleno — actualiza a Pro para más espacio de fotos.",
+    tooLarge: "Esa imagen es demasiado grande.",
+    badType: "Solo se pueden subir archivos de imagen.",
+    tooMany: "Límite de fotos alcanzado para esta fase.",
+    failed: "Falló la subida — revisa tu señal e inténtalo de nuevo.",
+    photoAlt: "Foto de estado",
+    crewTag: "cuadrilla",
   },
 
   history: {
