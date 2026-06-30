@@ -7,6 +7,7 @@ import {
 } from "@/lib/participant";
 import { BroadcastRefresh } from "@/components/BroadcastRefresh";
 import { notesForParticipant } from "@/lib/notes";
+import { photosForParticipant } from "@/lib/photos";
 import { getDictionary } from "@/lib/i18n/server";
 import { ParticipantBoard } from "./ParticipantBoard";
 import type { Phase } from "@/lib/types";
@@ -83,6 +84,17 @@ export default async function ParticipantPage({
       )
     : {};
 
+  // M22: status-evidence photos on this crew's assigned phases (member photos +
+  // their own), scoped to the assigned phase ids — same boundary as notes.
+  const photosByPhase = job
+    ? await photosForParticipant(
+        jobId,
+        job.org_id,
+        participant.id,
+        myPhases.map((p) => p.id),
+      )
+    : {};
+
   return (
     <>
       <BroadcastRefresh jobId={jobId} />
@@ -93,6 +105,7 @@ export default async function ParticipantPage({
         participantName={participant.name}
         phases={myPhases}
         notesByPhase={notesByPhase}
+        photosByPhase={photosByPhase}
       />
     </>
   );

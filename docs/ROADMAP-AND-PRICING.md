@@ -11,17 +11,18 @@ are reflected in the constitution at `AGENTS.md` §9.
 
 | Tier | Price | Seats | Includes |
 |---|---|---|---|
-| **Base** | **$39/mo** (promo **$20 × 3 mo**, Trinity + one more only) | up to ~15 salesman/owner seats; unlimited crew links | Core board (v1) + phase **notes** + **activity log** + **blocker duration** + **auto-assign sole sub** + **owner roll-up grid** + **insurance attestation** + **preferred payment method** |
-| **Pro** | **$99/mo** | up to ~40 seats | Base + **photo uploads** (R2, compressed, capped storage) + **incentive scoreboard** |
+| **Base** | **$49/mo** (promo **$20 × 3 mo**, Trinity + one more only) | up to ~15 salesman/owner seats; unlimited crew links | Core board (v1) + phase **notes** + **activity log** + **blocker duration** + **auto-assign sole sub** + **owner roll-up grid** + **insurance attestation** + **preferred payment method** + **photo uploads** (R2, **10 GB** cap) |
+| **Pro** | **$99/mo** | up to ~40 seats | Base + **100 GB photo storage** (10× the Base cap) + **incentive scoreboard** |
 | **Enterprise** | **custom, from ~$299/mo** | custom | Pro + **video**, large storage, **master/document files**, SSO, priority support, white-glove onboarding |
 
 - **Billing unit = salesman/GC seats.** Crew (subcontractors) are cookie-token
   participants, not auth users, and cost ~nothing — always unlimited.
 - **Promo:** $20/mo for the first **3 months**, limited to **Trinity** and **one
   more company (Tio Jose / Mario)**. Everyone after pays the standard tier price.
-- **Founding-customer perk:** grandfather Trinity into **photo uploads** (a Pro
-  feature) at their promo price — R2 makes it nearly free for us, and they're the
-  referral engine into the flooring industry.
+- **Trinity is on Base** (no grandfather needed): photos are now a **Base** feature
+  at the Base **10 GB** cap, so Trinity gets image uploads on Base and pays **$49**
+  when the promo ends. R2 keeps it nearly free for us; they remain the referral
+  engine into the flooring industry.
 
 ### Cost model (why this is profitable)
 - Fixed infra: Supabase Pro ($25) + Vercel Pro ($20) = **~$45/mo**. Resend free to
@@ -46,12 +47,12 @@ are reflected in the constitution at `AGENTS.md` §9.
 | **M15** | **Owner roll-up grid** (per-salesman job shelves) | Base | Depends on M14. Design locked in §4. |
 | **M16** | **Admin: companies + emails + seat/usage counts** | internal | Extends `/admin`. Needs M14. |
 | **M17** | **Phase notes** (gate/lockbox codes) | Base | ✅ **Done** (two-sided author, RLS matrix, live-refresh). |
-| **M10** | **Soft-delete + restore + purge** (jobs) | Base | **Next.** (promoted from M17 R3: jobs archive but can't delete). |
+| **M10** | **Soft-delete + restore + purge** (jobs) | Base | ✅ **Done** (soft-delete + restore + owner hard-purge; M22 purge frees R2). |
 | **M18** | **Activity log + blocker duration** | Base | ✅ **Done** (append-only activity_log, two-sided actor, per-phase History + "Blocked Nd" pill, live-refresh). |
 | **M19** | **Auto-assign sole subcontractor** | Base | Small, pure logic. |
 | **M20** | **Insurance attestation checkbox** | Base | Stores exact text + identity + timestamp. Reuses App 2 signature tech. |
 | **M21** | **Preferred payment method** (crew field) | Base | Minor; can fold into M17/M20. |
-| **M22** | **Photo uploads** (Blocked/Done/In-progress) | **Pro** | Cloudflare R2 + compression + per-org cap. |
+| **M22** | **Photo uploads** (Blocked/Done/In-progress) | **Base + Pro** | ✅ **Done** (R2 direct-serve via CDN domain, client compression + thumbs, storage cap 10/100 GB, two-sided uploader, live-refresh). |
 | **M23** | **Incentive scoreboard** | **Pro** | Validate with Trinity first. |
 
 **Also still relevant from earlier backlog:** M11 phase deadlines, M12 owner email

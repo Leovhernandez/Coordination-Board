@@ -157,9 +157,17 @@ gated behind a pricing tier (see `docs/ROADMAP-AND-PRICING.md`).
   the log's own insert drives the refresh, sidestepping a commit-ordering race).
 - **Insurance attestation + preferred payment method (Base).** Light crew-side
   fields; attestation stores exact agreed text + identity + timestamp.
-- **Photo uploads on Blocked/Done/In-progress (Pro).** Status-evidence photos
-  **only**, via **Cloudflare R2** (zero egress) + client-side compression +
-  per-org storage cap. **Not** document management or invoicing.
+- **Photo uploads on Blocked/Done/In-progress (Base + Pro).** Status-evidence
+  photos **only**, via **Cloudflare R2** (zero egress; served from a CDN custom
+  domain, never proxied through Vercel) + client-side compression + thumbnails.
+  **Shipped (M22):** a Base+Pro feature gated by a **storage cap** — the cap is the
+  upsell, not the feature (Base 10 GB, Pro 100 GB; `organizations.plan` + optional
+  `storage_cap_bytes`). Two-sided uploader (member or crew on assigned phases);
+  writes are server-only (members SELECT-only via `can_read_job`) with the per-org
+  cap re-checked on presign **and** confirm; `photos` published + REPLICA IDENTITY
+  FULL (thumbnails live-refresh, deletes propagate); M10 `purgeJob` frees the job's
+  R2 objects. **Not** document management, video, or invoicing. **Supersedes the
+  earlier "Pro-only" framing** — Trinity is on Base and gets photos at the Base cap.
 - **Incentive scoreboard (Pro).** Points for crew actions. Validate with Trinity
   before heavy build.
 

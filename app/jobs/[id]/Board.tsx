@@ -1,13 +1,20 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import type { ActivityView, NoteView, Phase, PhaseStatus } from "@/lib/types";
+import type {
+  ActivityView,
+  NoteView,
+  Phase,
+  PhaseStatus,
+  PhotoView,
+} from "@/lib/types";
 import { STATUS_ACCENT, STATUS_ACTIVE, STATUS_PILL } from "@/lib/status";
 import { computeHeadline } from "@/lib/critical-path";
 import { elapsedCompact } from "@/lib/relative-time";
 import { Headline } from "@/components/Headline";
 import { PhaseNotes } from "@/components/PhaseNotes";
 import { PhaseHistory } from "@/components/PhaseHistory";
+import { PhasePhotos } from "@/components/PhasePhotos";
 import { useT } from "@/components/I18nProvider";
 import type { Dict } from "@/lib/i18n/dictionaries";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -15,6 +22,8 @@ import {
   addNote,
   addPhase,
   assignPhase,
+  confirmUpload,
+  createUploadUrl,
   deleteNote,
   deletePhase,
   editNote,
@@ -64,6 +73,7 @@ export function Board({
   participants,
   notesByPhase = {},
   activityByPhase = {},
+  photosByPhase = {},
   readOnly = false,
 }: {
   jobId: string;
@@ -74,6 +84,8 @@ export function Board({
   /** M18: activity events per phase id (actor resolved server-side), newest last.
    *  Powers the History disclosure + the "Blocked Nd" duration pill. */
   activityByPhase?: Record<string, ActivityView[]>;
+  /** M22: status-evidence photos per phase id (CDN urls + uploader resolved). */
+  photosByPhase?: Record<string, PhotoView[]>;
   /** M-DASH: a member viewing another member's job sees phases + statuses +
    *  headline but NO write controls (no status buttons, no Edit phases). The
    *  SAME component renders both so they can't drift. */
@@ -328,6 +340,17 @@ export function Board({
                 />
 
                 <PhaseHistory events={phaseEvents} />
+
+                <PhasePhotos
+                  phaseId={p.id}
+                  statusContext={p.status === "not_started" ? null : p.status}
+                  photos={photosByPhase[p.id] ?? []}
+                  canAdd={!readOnly}
+                  onCreateUploadUrl={(input) =>
+                    createUploadUrl({ jobId, ...input })
+                  }
+                  onConfirm={(input) => confirmUpload({ jobId, ...input })}
+                />
               </>
             )}
           </div>

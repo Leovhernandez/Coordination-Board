@@ -49,7 +49,8 @@ export default async function RootLayout({
   return (
     <html
       lang={lang}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      translate="no"
+      className={`${geistSans.variable} ${geistMono.variable} notranslate h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <I18nProvider dict={dictionaries[lang]} lang={lang}>
