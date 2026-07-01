@@ -205,6 +205,13 @@ export const en = {
       "Tap below to sign in to your job board. No password, no setup — it opens straight to the jobs assigned to you.",
     inviteButton: "Sign in to Coordination Board",
     inviteFooter: "If you didn’t expect this, you can ignore this email.",
+    cancelSubject: "Export your Coordination Board data within 30 days",
+    cancelHeading: "Your subscription was canceled",
+    cancelBody:
+      "Your Coordination Board account for {org} has been canceled. Your job boards and photos stay available to export until {date} — 30 days from now. After that they are permanently deleted and cannot be recovered.",
+    cancelButton: "Export my data",
+    cancelFooter:
+      "Export any time before {date} from the Billing page. If you didn’t mean to cancel, just resubscribe from Billing before then.",
   },
 
   authConfirm: {
@@ -518,6 +525,13 @@ export const es: Dict = {
       "Toca abajo para entrar a tu tablero de trabajos. Sin contraseña, sin configuración — abre directo a los trabajos asignados a ti.",
     inviteButton: "Iniciar sesión en Coordination Board",
     inviteFooter: "Si no esperabas esto, puedes ignorar este correo.",
+    cancelSubject: "Exporta tus datos de Coordination Board en 30 días",
+    cancelHeading: "Tu suscripción fue cancelada",
+    cancelBody:
+      "Tu cuenta de Coordination Board para {org} fue cancelada. Tus tableros y fotos seguirán disponibles para exportar hasta el {date} — 30 días a partir de hoy. Después se eliminarán de forma permanente y no se podrán recuperar.",
+    cancelButton: "Exportar mis datos",
+    cancelFooter:
+      "Exporta en cualquier momento antes del {date} desde la página de Facturación. Si no querías cancelar, vuelve a suscribirte desde Facturación antes de esa fecha.",
   },
 
   authConfirm: {

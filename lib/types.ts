@@ -13,6 +13,9 @@ export type Organization = {
   subscription_status: string;
   stripe_customer_id: string | null;
   trial_ends_at: string | null;
+  // Cancel-retention: stamped on Stripe cancellation; starts the 30-day export
+  // window before the purge-canceled cron erases the org. Null = not canceled.
+  canceled_at: string | null;
   // M14: max salesmen the owner may invite (admin-adjustable per business).
   salesman_seat_limit: number;
   // M22: capability tier + photo storage cap. `plan` defaults to 'base'; the cap is
