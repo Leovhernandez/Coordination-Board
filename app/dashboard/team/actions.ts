@@ -53,6 +53,25 @@ export async function inviteSalesman(formData: FormData) {
   revalidatePath("/dashboard/team");
 }
 
+/**
+ * Owner opt-in (M21): toggle whether crew are asked for a preferred payment
+ * method. Org-level, default off. Owner-gated. Revalidates the team screen and the
+ * dashboard so the owner's own surfaces reflect it; open crew boards pick it up on
+ * their next load (it's an owner config change, not live job data).
+ */
+export async function setCollectPaymentMethod(value: boolean) {
+  const ctx = await getSessionContext();
+  if (!ctx || !ctx.isOwner) return;
+
+  const svc = createServiceClient();
+  await svc
+    .from("organizations")
+    .update({ collect_payment_method: value })
+    .eq("id", ctx.org.id);
+  revalidatePath("/dashboard/team");
+  revalidatePath("/dashboard");
+}
+
 /** Owner removes a salesman from the org. Never removes the owner. */
 export async function removeSalesman(memberId: string) {
   const ctx = await getSessionContext();

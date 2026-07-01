@@ -51,7 +51,7 @@ are reflected in the constitution at `AGENTS.md` §9.
 | **M18** | **Activity log + blocker duration** | Base | ✅ **Done** (append-only activity_log, two-sided actor, per-phase History + "Blocked Nd" pill, live-refresh). |
 | **M19** | **Auto-assign sole subcontractor** | Base | Small, pure logic. |
 | **M20** | **Insurance attestation checkbox** | Base | Stores exact text + identity + timestamp. Reuses App 2 signature tech. |
-| **M21** | **Preferred payment method** (crew field) | Base | Minor; can fold into M17/M20. |
+| **M21** | **Preferred payment method** (crew field) | Base | ✅ **Done** (owner opt-in toggle default OFF; per-participant `payment_type` select + `payment_detail`; owner/owning-salesman see it in the Crew panel; participants published for live-refresh). |
 | **M22** | **Photo uploads** (Blocked/Done/In-progress) | **Base + Pro** | ✅ **Done** (R2 direct-serve via CDN domain, client compression + thumbs, storage cap 10/100 GB, two-sided uploader, live-refresh). |
 | **M23** | **Incentive scoreboard** | **Pro** | Validate with Trinity first. |
 

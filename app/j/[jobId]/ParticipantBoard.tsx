@@ -8,12 +8,14 @@ import { interpolate } from "@/lib/i18n/interpolate";
 import { LangToggle } from "@/components/LangToggle";
 import { PhaseNotes } from "@/components/PhaseNotes";
 import { PhasePhotos } from "@/components/PhasePhotos";
+import { PaymentPrompt } from "@/components/PaymentPrompt";
 import {
   addCrewNote,
   confirmCrewUpload,
   createCrewUploadUrl,
   deleteCrewNote,
   editCrewNote,
+  setCrewPaymentMethod,
   updateAssignedPhase,
 } from "./actions";
 
@@ -37,6 +39,9 @@ export function ParticipantBoard({
   phases,
   notesByPhase = {},
   photosByPhase = {},
+  collectPaymentMethod = false,
+  paymentType = null,
+  paymentDetail = null,
 }: {
   jobId: string;
   jobName: string;
@@ -46,6 +51,10 @@ export function ParticipantBoard({
   notesByPhase?: Record<string, NoteView[]>;
   /** M22: status-evidence photos on assigned phases (member photos + their own). */
   photosByPhase?: Record<string, PhotoView[]>;
+  /** M21: owner opt-in — show the preferred-payment prompt. */
+  collectPaymentMethod?: boolean;
+  paymentType?: string | null;
+  paymentDetail?: string | null;
 }) {
   const t = useT();
   const [, startTransition] = useTransition();
@@ -98,6 +107,16 @@ export function ParticipantBoard({
         </div>
         <LangToggle />
       </header>
+
+      {collectPaymentMethod && (
+        <PaymentPrompt
+          type={paymentType}
+          detail={paymentDetail}
+          onSave={(type, detail) =>
+            setCrewPaymentMethod(jobId, type, detail)
+          }
+        />
+      )}
 
       {optimisticPhases.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">

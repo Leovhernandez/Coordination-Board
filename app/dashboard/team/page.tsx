@@ -4,6 +4,7 @@ import { getSessionContext, listMembers } from "@/lib/membership";
 import { getDictionary } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { inviteSalesman, removeSalesman } from "./actions";
+import { PaymentMethodToggle } from "./PaymentMethodToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,8 @@ export default async function TeamPage() {
           </div>
         ))}
       </section>
+
+      <PaymentMethodToggle initial={ctx.org.collect_payment_method} />
     </main>
   );
 }

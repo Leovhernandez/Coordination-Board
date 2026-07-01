@@ -22,6 +22,9 @@ export type Organization = {
   // derived from plan unless storage_cap_bytes overrides it (lib/capabilities.ts).
   plan: string;
   storage_cap_bytes: number | null;
+  // M21: owner opt-in — when true, crew are prompted for a preferred payment
+  // method and the owner/owning-salesman see it. Default false.
+  collect_payment_method: boolean;
 };
 
 export type Job = {
@@ -60,7 +63,22 @@ export type Participant = {
   invite_token: string;
   revoked: boolean;
   last_seen_at: string | null;
+  // M21: preferred payment method (owner opt-in). payment_type ∈ PAYMENT_TYPES or
+  // null; payment_detail is free text (phone/@handle/note). Per job/link row.
+  payment_type: string | null;
+  payment_detail: string | null;
 };
+
+// M21: the allowed preferred-payment methods. Single source of truth shared by the
+// crew select, the owner-side label, and the server-action normalizer + DB CHECK.
+export const PAYMENT_TYPES = [
+  "zelle",
+  "venmo",
+  "check",
+  "cash",
+  "other",
+] as const;
+export type PaymentType = (typeof PAYMENT_TYPES)[number];
 
 // M17: a small, structured note on a phase (gate/lockbox codes, access info, URLs).
 // Two-sided author — exactly one of author_member_id / author_participant_id is set

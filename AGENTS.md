@@ -157,6 +157,15 @@ gated behind a pricing tier (see `docs/ROADMAP-AND-PRICING.md`).
   the log's own insert drives the refresh, sidestepping a commit-ordering race).
 - **Insurance attestation + preferred payment method (Base).** Light crew-side
   fields; attestation stores exact agreed text + identity + timestamp.
+  **Preferred payment method shipped (M21):** owner opt-in
+  `organizations.collect_payment_method` (default OFF — no prompt/field unless the
+  owner turns it on, from the Team page). When ON, crew set a `payment_type`
+  (zelle|venmo|check|cash|other, DB-CHECK-constrained) + free-text `payment_detail`
+  on `participants` via a token-scoped server action (own row only); the owner /
+  owning-salesman see it in the Crew panel. Per job/link row — a cross-job crew
+  directory is §7 anti-scope. **Not** invoicing/payments. Live-refreshes
+  (`participants` published + REPLICA IDENTITY FULL; RLS `can_access_job` keeps the
+  invite_token from leaking via `postgres_changes`).
 - **Photo uploads on Blocked/Done/In-progress (Base + Pro).** Status-evidence
   photos **only**, via **Cloudflare R2** (zero egress; served from a CDN custom
   domain, never proxied through Vercel) + client-side compression + thumbnails.
