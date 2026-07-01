@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ORG_COLUMNS } from "@/lib/org-columns";
 import type { Organization } from "@/lib/types";
-
-const ORG_COLUMNS =
-  "id, name, owner_user_id, owner_email, subscription_status, stripe_customer_id, trial_ends_at, salesman_seat_limit";
 
 const TRIAL_DAYS = 14;
 
