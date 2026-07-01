@@ -32,7 +32,7 @@ export type SessionContext = {
 
 const MEMBER_COLUMNS = "id, org_id, user_id, role, name, email";
 const ORG_COLUMNS =
-  "id, name, owner_user_id, owner_email, subscription_status, canceled_at, stripe_customer_id, trial_ends_at, salesman_seat_limit, plan, storage_cap_bytes";
+  "id, name, owner_user_id, owner_email, subscription_status, canceled_at, stripe_customer_id, trial_ends_at, salesman_seat_limit, plan, storage_cap_bytes, collect_payment_method";
 
 type Svc = ReturnType<typeof createServiceClient>;
 

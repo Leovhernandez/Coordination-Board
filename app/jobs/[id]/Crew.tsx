@@ -10,14 +10,20 @@ export type CrewMember = {
   name: string;
   phone: string | null;
   link: string;
+  // M21: preferred payment method (only shown when the org opted in).
+  paymentType?: string | null;
+  paymentDetail?: string | null;
 };
 
 export function Crew({
   jobId,
   crew,
+  collectPaymentMethod = false,
 }: {
   jobId: string;
   crew: CrewMember[];
+  /** M21: owner opt-in — show each crew member's preferred payment method. */
+  collectPaymentMethod?: boolean;
 }) {
   const t = useT();
   const [, startTransition] = useTransition();
@@ -77,6 +83,18 @@ export function Crew({
             {m.phone && (
               <p className="text-xs text-slate-500">{m.phone}</p>
             )}
+            {collectPaymentMethod &&
+              (m.paymentType ? (
+                <p className="text-xs text-slate-600">
+                  <span className="font-medium">{t.payment.ownerLabel}:</span>{" "}
+                  {t.payment.types[
+                    m.paymentType as keyof typeof t.payment.types
+                  ] ?? m.paymentType}
+                  {m.paymentDetail ? ` · ${m.paymentDetail}` : ""}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400">{t.payment.notSet}</p>
+              ))}
             <div className="mt-2 flex gap-2">
               <button
                 type="button"

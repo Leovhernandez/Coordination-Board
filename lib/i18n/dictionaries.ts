@@ -171,6 +171,28 @@ export const en = {
     joined: "Joined",
     invited: "Invited",
     remove: "Remove",
+    paymentToggleTitle: "Ask crew for preferred payment",
+    paymentToggleHint:
+      "When on, each crew member can add how they’d like to be paid. Only you and the job’s salesman see it.",
+  },
+
+  payment: {
+    promptTitle: "Preferred payment",
+    promptHint: "How would you like to be paid? Only your GC sees this.",
+    typeLabel: "Method",
+    choose: "Select a method…",
+    detailPlaceholder: "e.g. phone number, @handle, or a note",
+    save: "Save",
+    saved: "Saved",
+    notSet: "Not provided yet",
+    ownerLabel: "Pays via",
+    types: {
+      zelle: "Zelle",
+      venmo: "Venmo",
+      check: "Check",
+      cash: "Cash",
+      other: "Other",
+    },
   },
 
   billing: {
@@ -491,6 +513,28 @@ export const es: Dict = {
     joined: "Unido",
     invited: "Invitado",
     remove: "Eliminar",
+    paymentToggleTitle: "Pedir método de pago al equipo",
+    paymentToggleHint:
+      "Cuando está activo, cada miembro del equipo puede indicar cómo prefiere cobrar. Solo tú y el vendedor del trabajo lo ven.",
+  },
+
+  payment: {
+    promptTitle: "Pago preferido",
+    promptHint: "¿Cómo prefieres que te paguen? Solo tu GC lo ve.",
+    typeLabel: "Método",
+    choose: "Elige un método…",
+    detailPlaceholder: "ej. número de teléfono, @usuario o una nota",
+    save: "Guardar",
+    saved: "Guardado",
+    notSet: "Aún no proporcionado",
+    ownerLabel: "Cobra por",
+    types: {
+      zelle: "Zelle",
+      venmo: "Venmo",
+      check: "Cheque",
+      cash: "Efectivo",
+      other: "Otro",
+    },
   },
 
   billing: {

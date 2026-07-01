@@ -23,6 +23,7 @@ import {
   storageCapBytes,
 } from "@/lib/capabilities";
 import { orgStorageUsedBytes } from "@/lib/photos";
+import { PAYMENT_TYPES } from "@/lib/types";
 import type {
   ConfirmUploadInput,
   ConfirmUploadResult,
@@ -346,4 +347,58 @@ export async function confirmCrewUpload(
   }
   await revalidateCrew(jobId);
   return { ok: true };
+}
+
+// --- Preferred payment method (M21, crew side) ---
+//
+// Owner opt-in (organizations.collect_payment_method). Same token-scoped
+// enforcement as the other crew writes: validate token -> participant, then write
+// ONLY this participant's own row via the service role. The value is participant-
+// level (not phase-scoped), so there is no phase check. The org opt-in is
+// re-checked server-side (defense-in-depth; the UI also gates it). Not logged to
+// History — it isn't a phase/coordination event.
+export async function setCrewPaymentMethod(
+  jobId: string,
+  paymentType: string | null,
+  paymentDetail: string | null,
+) {
+  const token = (await cookies()).get(participantCookieName(jobId))?.value;
+  const participant = await getParticipantByToken(jobId, token);
+  if (!participant) return;
+
+  const supabase = createServiceClient();
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("org_id, deleted_at")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job || job.deleted_at) return;
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("collect_payment_method")
+    .eq("id", job.org_id)
+    .maybeSingle();
+  if (!org?.collect_payment_method) return; // owner hasn't opted in
+
+  const type =
+    paymentType && (PAYMENT_TYPES as readonly string[]).includes(paymentType)
+      ? paymentType
+      : null;
+  // Clearing the method clears the detail; cap free-text length defensively.
+  const detail = type
+    ? paymentDetail?.trim()
+      ? paymentDetail.trim().slice(0, 200)
+      : null
+    : null;
+
+  await supabase
+    .from("participants")
+    .update({
+      payment_type: type,
+      payment_detail: detail,
+      last_seen_at: new Date().toISOString(),
+    })
+    .eq("id", participant.id);
+
+  await revalidateCrew(jobId);
 }

@@ -71,7 +71,14 @@ export default async function JobBoardPage({
   // Crew rows carry the secret invite_token. The owner / owning salesman read
   // them (RLS-allowed) to manage links; a read-only viewer gets assignee NAMES
   // ONLY, resolved server-side via the service client — never a token (§5).
-  let crew: { id: string; name: string; phone: string | null; link: string }[] = [];
+  let crew: {
+    id: string;
+    name: string;
+    phone: string | null;
+    link: string;
+    paymentType: string | null;
+    paymentDetail: string | null;
+  }[] = [];
   let assignees: { id: string; name: string }[] = [];
   if (canEdit) {
     const { data } = await supabase
@@ -86,6 +93,8 @@ export default async function JobBoardPage({
       name: p.name,
       phone: p.phone,
       link: participantLink(id, p.invite_token),
+      paymentType: p.payment_type,
+      paymentDetail: p.payment_detail,
     }));
     assignees = participants.map((p) => ({ id: p.id, name: p.name }));
   } else {
@@ -104,7 +113,7 @@ export default async function JobBoardPage({
       <RealtimeRefresh
         channelName={`phases-job-${job.id}`}
         filter={`job_id=eq.${job.id}`}
-        tables={["phases", "notes", "activity_log", "photos"]}
+        tables={["phases", "notes", "activity_log", "photos", "participants"]}
       />
       <header>
         <div className="flex items-center justify-between">
@@ -171,7 +180,13 @@ export default async function JobBoardPage({
         readOnly={!canEdit}
       />
 
-      {canEdit && <Crew jobId={job.id} crew={crew} />}
+      {canEdit && (
+        <Crew
+          jobId={job.id}
+          crew={crew}
+          collectPaymentMethod={ctx.org.collect_payment_method}
+        />
+      )}
     </main>
   );
 }

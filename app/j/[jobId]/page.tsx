@@ -95,6 +95,26 @@ export default async function ParticipantPage({
       )
     : {};
 
+  // M21: only when the owner opted in do we prompt for a preferred payment method
+  // and load this participant's current value (per job/link row).
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("collect_payment_method")
+    .eq("id", job.org_id)
+    .maybeSingle();
+  const collectPaymentMethod = !!org?.collect_payment_method;
+  let paymentType: string | null = null;
+  let paymentDetail: string | null = null;
+  if (collectPaymentMethod) {
+    const { data: pay } = await supabase
+      .from("participants")
+      .select("payment_type, payment_detail")
+      .eq("id", participant.id)
+      .maybeSingle();
+    paymentType = pay?.payment_type ?? null;
+    paymentDetail = pay?.payment_detail ?? null;
+  }
+
   return (
     <>
       <BroadcastRefresh jobId={jobId} />
@@ -106,6 +126,9 @@ export default async function ParticipantPage({
         phases={myPhases}
         notesByPhase={notesByPhase}
         photosByPhase={photosByPhase}
+        collectPaymentMethod={collectPaymentMethod}
+        paymentType={paymentType}
+        paymentDetail={paymentDetail}
       />
     </>
   );
