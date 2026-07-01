@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionContext, listMembers } from "@/lib/membership";
 import { getDictionary } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { inviteSalesman, removeSalesman } from "./actions";
 import { PaymentMethodToggle } from "./PaymentMethodToggle";
 
@@ -22,6 +23,11 @@ export default async function TeamPage() {
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 p-4">
+      {/* N1: live-refresh the invited→joined pill when a salesman claims their
+          invite (claimPendingInvite UPDATEs org_members.user_id). org_members is
+          published + RLS-scoped to this org; an UPDATE carries the new row, so no
+          REPLICA IDENTITY FULL needed. */}
+      <RealtimeRefresh channelName="team" tables={["org_members"]} />
       <header>
         <Link
           href="/dashboard"

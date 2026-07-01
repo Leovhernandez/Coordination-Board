@@ -245,6 +245,14 @@ export const en = {
     verifyFailed: "Sign-in link couldn’t be verified — request a fresh one.",
     sameBrowser:
       "Couldn’t complete sign-in — open the link in the same browser you requested it from.",
+    webviewHeading: "Open in your browser",
+    webviewBody:
+      "This link opened inside your email app. To stay signed in, finish in your phone’s browser.",
+    webviewOpenButton: "Open in browser",
+    webviewIosHint:
+      "On iPhone: tap your email app’s menu (⋯ or Share) and choose “Open in Safari” — or copy the link below and paste it into Safari.",
+    webviewCopy: "Copy sign-in link",
+    webviewCopied: "Copied — paste it in Safari",
   },
 
   admin: {
@@ -588,6 +596,14 @@ export const es: Dict = {
       "No se pudo verificar el enlace de acceso — solicita uno nuevo.",
     sameBrowser:
       "No se pudo completar el inicio de sesión — abre el enlace en el mismo navegador donde lo solicitaste.",
+    webviewHeading: "Abre en tu navegador",
+    webviewBody:
+      "Este enlace se abrió dentro de tu app de correo. Para mantener la sesión, termina en el navegador de tu teléfono.",
+    webviewOpenButton: "Abrir en el navegador",
+    webviewIosHint:
+      "En iPhone: abre el menú de tu app de correo (⋯ o Compartir) y elige “Abrir en Safari” — o copia el enlace de abajo y pégalo en Safari.",
+    webviewCopy: "Copiar enlace de acceso",
+    webviewCopied: "Copiado — pégalo en Safari",
   },
 
   admin: {
