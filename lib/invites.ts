@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getDictionary } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
-import type { Dict } from "@/lib/i18n/dictionaries";
+import { dictionaries, type Dict } from "@/lib/i18n/dictionaries";
 
 /**
  * Salesman invite emails (M14). When an owner (or the admin) invites a salesman,
@@ -126,6 +126,83 @@ function signInHtml(t: Dict, link: string): string {
       ${t.email.signInButton}
     </a>
     <p style="margin:20px 0 0;color:#94a3b8;font-size:12px">${t.email.signInFooter}</p>
+  </div>`;
+}
+
+/**
+ * Notify an org owner that their subscription was canceled and their data is
+ * exportable for 30 days before permanent deletion (cancel-retention). Sent from
+ * the Stripe webhook — which has NO user-locale cookie/header — so the email is
+ * rendered BILINGUALLY (EN + ES) rather than guessing one language. Best-effort:
+ * returns false if email isn't configured or sending failed (never blocks the
+ * webhook; the retention clock + purge cron are independent of this notice).
+ */
+export async function sendCancellationNotice(
+  email: string,
+  orgName: string,
+  canceledAt: Date,
+): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || !SITE) return false;
+
+  const deadline = new Date(canceledAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const billingUrl = `${SITE}/billing`;
+  const en = dictionaries.en.email;
+  const es = dictionaries.es.email;
+  const enDate = deadline.toLocaleDateString("en-US", dateFmt);
+  const esDate = deadline.toLocaleDateString("es-ES", dateFmt);
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM,
+        to: [email],
+        subject: `${en.cancelSubject} · ${es.cancelSubject}`,
+        html:
+          cancelHtml(en, orgName, enDate, billingUrl) +
+          `<div style="max-width:480px;margin:0 auto;border-top:1px solid #e2e8f0"></div>` +
+          cancelHtml(es, orgName, esDate, billingUrl),
+      }),
+    });
+    if (!res.ok) {
+      console.error(
+        "[sendCancellationNotice] Resend rejected:",
+        res.status,
+        await res.text().catch(() => ""),
+      );
+    }
+    return res.ok;
+  } catch (err) {
+    console.error("[sendCancellationNotice] Resend threw:", err);
+    return false;
+  }
+}
+
+const dateFmt: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+};
+
+function cancelHtml(
+  e: Dict["email"],
+  orgName: string,
+  dateStr: string,
+  billingUrl: string,
+): string {
+  return `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
+    <h2 style="margin:0 0 8px;font-size:20px">${e.cancelHeading}</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:15px">${interpolate(e.cancelBody, { org: orgName, date: dateStr })}</p>
+    <a href="${billingUrl}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;font-size:15px">
+      ${e.cancelButton}
+    </a>
+    <p style="margin:20px 0 0;color:#94a3b8;font-size:12px">${interpolate(e.cancelFooter, { date: dateStr })}</p>
   </div>`;
 }
 
