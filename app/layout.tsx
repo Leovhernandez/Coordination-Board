@@ -52,7 +52,7 @@ export default async function RootLayout({
       translate="no"
       className={`${geistSans.variable} ${geistMono.variable} notranslate h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col overflow-x-clip">
         <I18nProvider dict={dictionaries[lang]} lang={lang}>
           {children}
           <Pwa />

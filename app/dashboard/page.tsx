@@ -191,7 +191,9 @@ export default async function DashboardPage({
         </div>
       </header>
 
-      <div className="flex items-center gap-2">
+      {/* N3: wrap the tab row so longer ES labels (e.g. "Facturación") never push
+          it past a narrow viewport and trigger a mobile zoom-out. */}
+      <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/dashboard"
           className={`rounded-full px-3 py-1 text-sm font-medium ${
@@ -221,7 +223,7 @@ export default async function DashboardPage({
         {isOwner && (
           <Link
             href="/dashboard/team"
-            className="ml-auto rounded-full px-3 py-1 text-sm font-medium text-slate-500"
+            className="rounded-full px-3 py-1 text-sm font-medium text-slate-500"
           >
             {t.nav.team}
           </Link>

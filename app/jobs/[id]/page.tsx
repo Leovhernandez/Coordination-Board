@@ -116,7 +116,7 @@ export default async function JobBoardPage({
         tables={["phases", "notes", "activity_log", "photos", "participants"]}
       />
       <header>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Link
             href="/dashboard"
             className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600 shadow-sm active:bg-slate-100"
