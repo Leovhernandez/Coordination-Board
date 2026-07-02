@@ -8,7 +8,9 @@ import {
   addSalesmanToOrg,
   deleteAccount,
   removeAllowedEmail,
+  schedulePromoTransition,
   setOrgStatus,
+  setPromoEligible,
   setTrialDays,
 } from "./actions";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
@@ -32,7 +34,9 @@ export default async function AdminPage() {
 
   const { data: orgsData } = await svc
     .from("organizations")
-    .select("id, name, owner_email, subscription_status, trial_ends_at")
+    .select(
+      "id, name, owner_email, subscription_status, trial_ends_at, plan, promo_eligible, promo_ends_at, stripe_customer_id",
+    )
     .order("created_at", { ascending: true });
   const orgs = orgsData ?? [];
 
@@ -78,13 +82,43 @@ export default async function AdminPage() {
                   {o.owner_email ?? o.name}
                 </span>
                 <span className="shrink-0 text-xs font-medium text-slate-500">
-                  {o.subscription_status}
+                  {o.plan} · {o.subscription_status}
                   {o.subscription_status === "trialing" && dl !== null
                     ? " " + interpolate(t.admin.daysLeft, { d: dl })
                     : ""}
                 </span>
               </div>
+              {o.promo_ends_at && (
+                <p className="mt-1 text-xs text-slate-500">
+                  {interpolate(t.admin.promoEnds, {
+                    date: new Date(o.promo_ends_at).toLocaleDateString(),
+                  })}
+                </p>
+              )}
               <div className="mt-2 flex flex-wrap gap-2">
+                <form action={setPromoEligible.bind(null, o.id, !o.promo_eligible)}>
+                  <button
+                    className={
+                      o.promo_eligible
+                        ? "rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+                        : chipBtn
+                    }
+                  >
+                    {o.promo_eligible ? t.admin.promoOn : t.admin.promoOff}
+                  </button>
+                </form>
+                {o.promo_eligible && o.stripe_customer_id && !o.promo_ends_at && (
+                  <form action={schedulePromoTransition.bind(null, o.id)}>
+                    <ConfirmSubmit
+                      message={interpolate(t.admin.promoScheduleConfirm, {
+                        who: o.owner_email ?? o.name,
+                      })}
+                      className={chipBtn}
+                    >
+                      {t.admin.promoSchedule}
+                    </ConfirmSubmit>
+                  </form>
+                )}
                 <form action={setTrialDays.bind(null, o.id, 14)}>
                   <button className={chipBtn}>{t.admin.trial14}</button>
                 </form>

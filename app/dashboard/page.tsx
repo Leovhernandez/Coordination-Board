@@ -8,7 +8,7 @@ import { computeHeadline } from "@/lib/critical-path";
 import { Headline } from "@/components/Headline";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 import { LangToggle } from "@/components/LangToggle";
-import { getDictionary } from "@/lib/i18n/server";
+import { getDictionary, getLang } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { isAccessAllowed } from "@/lib/stripe";
 import { isAdminEmail } from "@/lib/admin";
@@ -29,6 +29,7 @@ export default async function DashboardPage({
   if (!ctx) redirect("/login");
   const { org, isOwner, email, member } = ctx;
   const t = await getDictionary();
+  const lang = await getLang();
 
   const view = (await searchParams).view;
   const showArchived = view === "archived";
@@ -245,6 +246,23 @@ export default async function DashboardPage({
           </Link>
         )}
       </div>
+
+      {/* N2: dated promo-ending notice (owner-only — billing concern). */}
+      {isOwner &&
+        org.promo_ends_at &&
+        new Date(org.promo_ends_at).getTime() > Date.now() && (
+          <Link
+            href="/billing"
+            className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900"
+          >
+            {interpolate(t.billing.promoBanner, {
+              date: new Date(org.promo_ends_at).toLocaleDateString(
+                lang === "es" ? "es-ES" : "en-US",
+                { year: "numeric", month: "long", day: "numeric" },
+              ),
+            })}
+          </Link>
+        )}
 
       {!isAccessAllowed(org.subscription_status, org.trial_ends_at) && (
         <Link

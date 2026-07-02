@@ -25,6 +25,10 @@ export type Organization = {
   // M21: owner opt-in — when true, crew are prompted for a preferred payment
   // method and the owner/owning-salesman see it. Default false.
   collect_payment_method: boolean;
+  // N2: promo gate (admin-set, "Trinity + one more") + when the $20×3mo promo
+  // phase ends (drives the dated banner; past date = no banner).
+  promo_eligible: boolean;
+  promo_ends_at: string | null;
 };
 
 export type Job = {

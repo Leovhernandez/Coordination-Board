@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { getStripe, mapStripeStatus } from "@/lib/stripe";
+import {
+  getStripe,
+  mapStripeStatus,
+  planForPriceId,
+  promoPriceId,
+  schedulePromoToBase,
+} from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendCancellationNotice } from "@/lib/invites";
 
@@ -38,12 +44,13 @@ export async function POST(request: NextRequest) {
     col: "id" | "stripe_customer_id",
     value: string | null | undefined,
     status: string,
+    extra: Record<string, unknown> = {},
   ) {
     if (!value) return;
     if (status !== "canceled") {
       await supabase
         .from("organizations")
-        .update({ subscription_status: status, canceled_at: null })
+        .update({ subscription_status: status, canceled_at: null, ...extra })
         .eq(col, value);
       return;
     }
@@ -68,10 +75,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const setStatusByOrg = (orgId: string | undefined, status: string) =>
-    applyStatus("id", orgId, status);
-  const setStatusByCustomer = (customer: string | null, status: string) =>
-    applyStatus("stripe_customer_id", customer, status);
+  const setStatusByOrg = (
+    orgId: string | undefined,
+    status: string,
+    extra: Record<string, unknown> = {},
+  ) => applyStatus("id", orgId, status, extra);
+  const setStatusByCustomer = (
+    customer: string | null,
+    status: string,
+    extra: Record<string, unknown> = {},
+  ) => applyStatus("stripe_customer_id", customer, status, extra);
+
+  // N2: the stored plan follows the subscription's price (promo + legacy single
+  // price map to base; an unknown price leaves the stored plan untouched).
+  function planPatch(sub: Stripe.Subscription): Record<string, unknown> {
+    const plan = planForPriceId(sub.items?.data?.[0]?.price?.id);
+    return plan ? { plan } : {};
+  }
 
   switch (event.type) {
     case "checkout.session.completed": {
@@ -80,12 +100,34 @@ export async function POST(request: NextRequest) {
       const customer =
         typeof session.customer === "string" ? session.customer : null;
       if (orgId) {
+        // N2: derive the plan from the subscribed price, and if this is a promo
+        // checkout, attach the promo→Base schedule + record when the promo ends.
+        const subId =
+          typeof session.subscription === "string"
+            ? session.subscription
+            : (session.subscription?.id ?? null);
+        const extra: Record<string, unknown> = {};
+        if (subId) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(subId);
+            Object.assign(extra, planPatch(sub));
+            if (sub.items?.data?.[0]?.price?.id === promoPriceId()) {
+              const promoEnd = await schedulePromoToBase(subId);
+              if (promoEnd) extra.promo_ends_at = promoEnd.toISOString();
+            }
+          } catch (err) {
+            // Plan/schedule sync is best-effort here; subscription.updated will
+            // re-sync the plan, and the admin can retrofit the schedule.
+            console.error("[webhook] promo/plan sync failed:", err);
+          }
+        }
         await supabase
           .from("organizations")
           .update({
             stripe_customer_id: customer,
             subscription_status: "active",
             canceled_at: null, // re-subscribe stops any pending purge
+            ...extra,
           })
           .eq("id", orgId);
       }
@@ -96,11 +138,13 @@ export async function POST(request: NextRequest) {
       const sub = event.data.object as Stripe.Subscription;
       const status = mapStripeStatus(sub.status);
       const orgId = sub.metadata?.org_id;
-      if (orgId) await setStatusByOrg(orgId, status);
+      const extra = planPatch(sub);
+      if (orgId) await setStatusByOrg(orgId, status, extra);
       else
         await setStatusByCustomer(
           typeof sub.customer === "string" ? sub.customer : null,
           status,
+          extra,
         );
       break;
     }
