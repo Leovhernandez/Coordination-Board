@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendSalesmanInvite } from "@/lib/invites";
 import { isBusinessOwnerEmail } from "@/lib/access";
+import { getStripe, schedulePromoToBase } from "@/lib/stripe";
 
 async function guard() {
   await requireAdmin();
@@ -29,6 +30,61 @@ export async function setOrgStatus(orgId: string, status: string) {
     .from("organizations")
     .update({ subscription_status: status })
     .eq("id", orgId);
+  revalidatePath("/admin");
+}
+
+/**
+ * N2: flip an org's promo eligibility ("Trinity + one more only"). When true, a
+ * Base checkout uses the $20×3mo promo price; existing subscriptions are NOT
+ * touched here — that's the explicit retrofit button below.
+ */
+export async function setPromoEligible(orgId: string, value: boolean) {
+  const svc = await guard();
+  await svc
+    .from("organizations")
+    .update({ promo_eligible: value })
+    .eq("id", orgId);
+  revalidatePath("/admin");
+}
+
+/**
+ * N2 retrofit: attach the promo→Base Subscription Schedule to an org's EXISTING
+ * active promo-price subscription (Trinity signed before schedules existed).
+ * Promo ends 3 months after their original subscription start; Stripe flips the
+ * price itself. Idempotent — re-clicking reports the already-scheduled end.
+ * No-ops (with a flag in the URL) if the org has no active promo-price sub.
+ */
+export async function schedulePromoTransition(orgId: string) {
+  const svc = await guard();
+  const { data: org } = await svc
+    .from("organizations")
+    .select("stripe_customer_id")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (!org?.stripe_customer_id) {
+    revalidatePath("/admin");
+    return;
+  }
+
+  const stripe = getStripe();
+  const subs = await stripe.subscriptions.list({
+    customer: org.stripe_customer_id,
+    status: "active",
+    limit: 1,
+  });
+  const sub = subs.data[0];
+  if (!sub) {
+    revalidatePath("/admin");
+    return;
+  }
+
+  const promoEnd = await schedulePromoToBase(sub.id);
+  if (promoEnd) {
+    await svc
+      .from("organizations")
+      .update({ promo_ends_at: promoEnd.toISOString() })
+      .eq("id", orgId);
+  }
   revalidatePath("/admin");
 }
 

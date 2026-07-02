@@ -54,6 +54,7 @@ are reflected in the constitution at `AGENTS.md` §9.
 | **M21** | **Preferred payment method** (crew field) | Base | ✅ **Done** (owner opt-in toggle default OFF; per-participant `payment_type` select + `payment_detail`; owner/owning-salesman see it in the Crew panel; participants published for live-refresh). |
 | **M22** | **Photo uploads** (Blocked/Done/In-progress) | **Base + Pro** | ✅ **Done** (R2 direct-serve via CDN domain, client compression + thumbs, storage cap 10/100 GB, two-sided uploader, live-refresh). |
 | **M23** | **Incentive scoreboard** | **Pro** | Validate with Trinity first. |
+| **N2** | **Stripe tier pricing + promo→Base auto-transition** | — | ✅ **Done** (per-tier prices via env `STRIPE_PRICE_BASE/PRO/ENTERPRISE/PROMO`; `plan` synced from the subscription price by the webhook; promo = $20×3mo as phase 1 of a Subscription Schedule that flips to Base $49 automatically; `promo_eligible` admin flag + `/admin` retrofit button for pre-existing promo subs; dated EN/ES promo banner on dashboard + billing). Supersedes the single-price M8 checkout. |
 
 **Also still relevant from earlier backlog:** M11 phase deadlines, M12 owner email
 alerts (Resend). **M10 soft-delete + restore + purge** is now **scheduled** (see

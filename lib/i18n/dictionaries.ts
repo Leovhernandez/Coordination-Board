@@ -208,6 +208,22 @@ export const en = {
     ownerOnly: "Owner-only — subcontractors never see billing.",
     manage: "Manage billing",
     subscribe: "Subscribe",
+    tierBase: "Base",
+    tierPro: "Pro",
+    tierEnterprise: "Enterprise",
+    tierBasePrice: "$49/mo",
+    tierProPrice: "$99/mo",
+    tierEnterprisePrice: "$299/mo",
+    tierBaseDesc:
+      "The full board: notes, history, photos (10 GB), data export, up to 15 seats.",
+    tierProDesc:
+      "Everything in Base, plus 100 GB photo storage and up to 40 seats.",
+    tierEnterpriseDesc:
+      "Pro plus video, document storage, SSO, and priority support.",
+    currentPlan: "Current plan: {plan}",
+    promoOffer: "Your first 3 months are $20/month.",
+    promoBanner:
+      "Your promotional price ends on {date}. You'll move to the Base plan at $49/month.",
     exportTitle: "Export your data",
     exportDesc:
       "Download all your jobs, phases, notes, and activity as CSV files in a ZIP.",
@@ -275,6 +291,12 @@ export const en = {
     ownerEmailPlaceholder: "owner@company.com",
     add: "Add",
     daysLeft: "· {d}d left",
+    promoOn: "Promo: ON",
+    promoOff: "Promo: off",
+    promoSchedule: "Schedule promo → Base",
+    promoScheduleConfirm:
+      "Attach the promo→Base schedule to {who}'s live subscription? Their price flips to $49 automatically 3 months after their original start date. This changes their Stripe subscription.",
+    promoEnds: "Promo ends {date}",
   },
 
   misc: {
@@ -558,6 +580,22 @@ export const es: Dict = {
     ownerOnly: "Solo para el dueño — los subcontratistas nunca ven la facturación.",
     manage: "Administrar facturación",
     subscribe: "Suscribirse",
+    tierBase: "Base",
+    tierPro: "Pro",
+    tierEnterprise: "Enterprise",
+    tierBasePrice: "$49/mes",
+    tierProPrice: "$99/mes",
+    tierEnterprisePrice: "$299/mes",
+    tierBaseDesc:
+      "El tablero completo: notas, historial, fotos (10 GB), exportación de datos, hasta 15 usuarios.",
+    tierProDesc:
+      "Todo lo de Base, más 100 GB de almacenamiento de fotos y hasta 40 usuarios.",
+    tierEnterpriseDesc:
+      "Pro más video, almacenamiento de documentos, SSO y soporte prioritario.",
+    currentPlan: "Plan actual: {plan}",
+    promoOffer: "Tus primeros 3 meses cuestan $20/mes.",
+    promoBanner:
+      "Tu precio promocional termina el {date}. Pasarás al plan Base a $49/mes.",
     exportTitle: "Exporta tus datos",
     exportDesc:
       "Descarga todos tus trabajos, fases, notas y actividad como archivos CSV en un ZIP.",
@@ -626,6 +664,12 @@ export const es: Dict = {
     ownerEmailPlaceholder: "dueño@empresa.com",
     add: "Agregar",
     daysLeft: "· {d}d restantes",
+    promoOn: "Promo: SÍ",
+    promoOff: "Promo: no",
+    promoSchedule: "Programar promo → Base",
+    promoScheduleConfirm:
+      "¿Adjuntar el calendario promo→Base a la suscripción activa de {who}? Su precio cambia a $49 automáticamente 3 meses después de su fecha de inicio original. Esto modifica su suscripción de Stripe.",
+    promoEnds: "La promo termina el {date}",
   },
 
   misc: {

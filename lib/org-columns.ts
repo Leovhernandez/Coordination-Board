@@ -10,4 +10,4 @@
  * method invisible to the owner and stuck the Team-page toggle. One list fixes it.)
  */
 export const ORG_COLUMNS =
-  "id, name, owner_user_id, owner_email, subscription_status, canceled_at, stripe_customer_id, trial_ends_at, salesman_seat_limit, plan, storage_cap_bytes, collect_payment_method";
+  "id, name, owner_user_id, owner_email, subscription_status, canceled_at, stripe_customer_id, trial_ends_at, salesman_seat_limit, plan, storage_cap_bytes, collect_payment_method, promo_eligible, promo_ends_at";
