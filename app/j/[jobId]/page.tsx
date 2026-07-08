@@ -64,14 +64,27 @@ export default async function ParticipantPage({
     );
   }
 
-  // Only this participant's assigned phases ever leave the server.
-  const { data: phasesData } = await supabase
-    .from("phases")
-    .select("*")
+  // Only this participant's assigned phases ever leave the server. M-MULTI:
+  // assignment lives in the phase_assignees junction (a phase can carry several
+  // crew; this board still shows ONLY the viewer's own assignments).
+  const { data: paRows } = await supabase
+    .from("phase_assignees")
+    .select("phase_id")
     .eq("job_id", jobId)
-    .eq("assignee_participant_id", participant.id)
-    .order("sequence_index", { ascending: true });
-  const myPhases = (phasesData ?? []) as Phase[];
+    .eq("participant_id", participant.id);
+  const myPhaseIds = ((paRows ?? []) as { phase_id: string }[]).map(
+    (r) => r.phase_id,
+  );
+  let myPhases: Phase[] = [];
+  if (myPhaseIds.length > 0) {
+    const { data: phasesData } = await supabase
+      .from("phases")
+      .select("*")
+      .eq("job_id", jobId)
+      .in("id", myPhaseIds)
+      .order("sequence_index", { ascending: true });
+    myPhases = (phasesData ?? []) as Phase[];
+  }
 
   // M17: notes on this crew's assigned phases — member notes + their own crew
   // notes only (never another crew's), scoped to the assigned phase ids.

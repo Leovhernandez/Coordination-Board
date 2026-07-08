@@ -42,6 +42,23 @@ async function revalidateCrew(jobId: string) {
   await broadcastJobChange(jobId);
 }
 
+/** M-MULTI: is this participant one of the phase's assignees? (Replaces the
+ *  legacy single-FK check — assignment lives in the phase_assignees junction;
+ *  every co-assignee has identical crew permissions on the phase.) */
+async function isAssignedToPhase(
+  supabase: ReturnType<typeof createServiceClient>,
+  phaseId: string,
+  participantId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("phase_assignees")
+    .select("phase_id")
+    .eq("phase_id", phaseId)
+    .eq("participant_id", participantId)
+    .maybeSingle();
+  return !!data;
+}
+
 /**
  * Participant phase update. Enforces the CLAUDE.md §5 invariant end-to-end:
  *   1. read the httpOnly token cookie for THIS job,
@@ -64,13 +81,13 @@ export async function updateAssignedPhase(
 
   const { data: phase } = await supabase
     .from("phases")
-    .select("id, job_id, assignee_participant_id, status")
+    .select("id, job_id, status")
     .eq("id", phaseId)
     .maybeSingle();
   if (
     !phase ||
     phase.job_id !== jobId ||
-    phase.assignee_participant_id !== participant.id
+    !(await isAssignedToPhase(supabase, phaseId, participant.id))
   ) {
     return; // not this participant's phase
   }
@@ -125,13 +142,13 @@ export async function addCrewNote(jobId: string, phaseId: string, body: string) 
   const supabase = createServiceClient();
   const { data: phase } = await supabase
     .from("phases")
-    .select("id, job_id, assignee_participant_id")
+    .select("id, job_id")
     .eq("id", phaseId)
     .maybeSingle();
   if (
     !phase ||
     phase.job_id !== jobId ||
-    phase.assignee_participant_id !== participant.id
+    !(await isAssignedToPhase(supabase, phaseId, participant.id))
   ) {
     return; // not this participant's phase
   }
@@ -233,13 +250,13 @@ async function crewPhaseForWrite(jobId: string, phaseId: string) {
   const supabase = createServiceClient();
   const { data: phase } = await supabase
     .from("phases")
-    .select("id, job_id, assignee_participant_id")
+    .select("id, job_id")
     .eq("id", phaseId)
     .maybeSingle();
   if (
     !phase ||
     phase.job_id !== jobId ||
-    phase.assignee_participant_id !== participant.id
+    !(await isAssignedToPhase(supabase, phaseId, participant.id))
   ) {
     return null; // not this participant's phase
   }

@@ -84,9 +84,13 @@ export async function notesForJob(
 }
 
 /**
- * Notes a crew PARTICIPANT may see: on phases assigned to them only, and only
- * member-authored notes plus THEIR OWN crew notes (never another crew's). canEdit
- * is true only for their own notes (mirrors the token-scoped server-action rules).
+ * Notes a crew PARTICIPANT may see: on phases assigned to them only —
+ * member-authored notes plus ALL crew notes on those phases (M-MULTI: co-assignees
+ * on a shared phase read each other's notes; a since-unassigned author's note
+ * stays visible for context). canEdit is true only for THEIR OWN notes (the M17
+ * "no one edits another's note" rule — mirrored by the token-scoped actions).
+ * Scope stays strictly the assigned phase ids: notes on other phases never leave
+ * the server.
  */
 export async function notesForParticipant(
   jobId: string,
@@ -102,22 +106,19 @@ export async function notesForParticipant(
     .eq("job_id", jobId)
     .in("phase_id", phaseIds)
     .order("created_at", { ascending: true });
-  const notes = ((data ?? []) as Note[]).filter(
-    (n) =>
-      n.author_member_id != null || n.author_participant_id === participantId,
-  );
+  const notes = (data ?? []) as Note[];
   if (notes.length === 0) return {};
 
-  const [members, me] = await Promise.all([
+  const [members, participants] = await Promise.all([
     svc.from("org_members").select("id, name").eq("org_id", orgId),
-    svc.from("participants").select("id, name").eq("id", participantId).maybeSingle(),
+    svc.from("participants").select("id, name").eq("job_id", jobId),
   ]);
   const memberName = new Map(
     ((members.data ?? []) as NameRow[]).map((m) => [m.id, m.name]),
   );
-  const partName = new Map<string, string>();
-  const meRow = me.data as NameRow | null;
-  if (meRow) partName.set(meRow.id, meRow.name);
+  const partName = new Map(
+    ((participants.data ?? []) as NameRow[]).map((p) => [p.id, p.name]),
+  );
 
   return groupByPhase(
     notes.map((n) =>

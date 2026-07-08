@@ -21,7 +21,6 @@ import { interpolate } from "@/lib/i18n/interpolate";
 import {
   addNote,
   addPhase,
-  assignPhase,
   confirmUpload,
   createUploadUrl,
   deleteNote,
@@ -29,6 +28,7 @@ import {
   editNote,
   movePhase,
   renamePhase,
+  setPhaseAssignee,
   setPhaseStatus,
 } from "./actions";
 
@@ -71,6 +71,8 @@ export function Board({
   jobId,
   phases,
   participants,
+  assigneesByPhase = {},
+  maxAssignees = 10,
   notesByPhase = {},
   activityByPhase = {},
   photosByPhase = {},
@@ -79,6 +81,10 @@ export function Board({
   jobId: string;
   phases: Phase[];
   participants: CrewOption[];
+  /** M-MULTI: assigned participant ids per phase id (from phase_assignees). */
+  assigneesByPhase?: Record<string, string[]>;
+  /** M-MULTI: the org's per-phase crew cap (organizations.max_assignees_per_phase). */
+  maxAssignees?: number;
   /** M17: notes per phase id, author resolved + canEdit precomputed server-side. */
   notesByPhase?: Record<string, NoteView[]>;
   /** M18: activity events per phase id (actor resolved server-side), newest last.
@@ -153,8 +159,16 @@ export function Board({
     startTransition(() => addPhase(jobId, label));
   }
 
-  function onAssign(p: Phase, participantId: string | null) {
-    startTransition(() => assignPhase(p.id, jobId, participantId));
+  function onToggleAssignee(p: Phase, participantId: string, next: boolean) {
+    startTransition(() => setPhaseAssignee(p.id, jobId, participantId, next));
+  }
+
+  // M-MULTI: names of everyone assigned to a phase, for the sub-label line.
+  function assigneeNames(phaseId: string): string {
+    return (assigneesByPhase[phaseId] ?? [])
+      .map((id) => nameOf.get(id))
+      .filter(Boolean)
+      .join(", ");
   }
 
   return (
@@ -200,19 +214,42 @@ export function Board({
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                 />
                 {participants.length > 0 ? (
-                  <select
-                    value={p.assignee_participant_id ?? ""}
-                    onChange={(e) => onAssign(p, e.target.value || null)}
+                  // M-MULTI: chip toggles — tap a crew name to assign/unassign.
+                  // Every assignee gets identical permissions; adding is disabled
+                  // at the org cap (the action + DB trigger re-enforce it).
+                  <div
+                    role="group"
                     aria-label={t.board.assignToAria}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base outline-none focus:border-slate-900"
+                    className="flex flex-wrap items-center gap-1.5"
                   >
-                    <option value="">{t.board.unassigned}</option>
-                    {participants.map((pt) => (
-                      <option key={pt.id} value={pt.id}>
-                        {pt.name}
-                      </option>
-                    ))}
-                  </select>
+                    {participants.map((pt) => {
+                      const ids = assigneesByPhase[p.id] ?? [];
+                      const isAssigned = ids.includes(pt.id);
+                      const atCap = ids.length >= maxAssignees;
+                      return (
+                        <button
+                          key={pt.id}
+                          type="button"
+                          onClick={() => onToggleAssignee(p, pt.id, !isAssigned)}
+                          disabled={!isAssigned && atCap}
+                          aria-pressed={isAssigned}
+                          className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                            isAssigned
+                              ? "border-slate-900 bg-slate-900 text-white"
+                              : "border-slate-300 bg-white text-slate-600 active:bg-slate-100 disabled:opacity-30"
+                          }`}
+                        >
+                          {isAssigned ? "✓ " : ""}
+                          {pt.name}
+                        </button>
+                      );
+                    })}
+                    {(assigneesByPhase[p.id] ?? []).length >= maxAssignees && (
+                      <p className="w-full text-xs text-slate-400">
+                        {interpolate(t.board.assigneeCap, { n: maxAssignees })}
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <p className="text-xs text-slate-400">{t.board.addCrewHint}</p>
                 )}
@@ -251,12 +288,11 @@ export function Board({
                     <span className="font-semibold text-slate-900">
                       <span className="text-slate-400">{i + 1}.</span> {p.label}
                     </span>
-                    {p.assignee_participant_id &&
-                      nameOf.get(p.assignee_participant_id) && (
-                        <span className="block text-xs text-slate-400">
-                          {nameOf.get(p.assignee_participant_id)}
-                        </span>
-                      )}
+                    {assigneeNames(p.id) && (
+                      <span className="block text-xs text-slate-400">
+                        {assigneeNames(p.id)}
+                      </span>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     {blockedSince && (

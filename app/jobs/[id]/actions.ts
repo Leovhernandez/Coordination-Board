@@ -289,53 +289,65 @@ export async function revokeParticipant(participantId: string, jobId: string) {
 }
 
 /** Assigns (or clears) the participant who may update a phase. */
-export async function assignPhase(
+/**
+ * M-MULTI: toggles ONE crew assignment on a phase. `assigned=true` adds the
+ * participant (up to the org's max_assignees_per_phase), false removes them.
+ * Writes go to the phase_assignees junction — never the legacy
+ * phases.assignee_participant_id column. RLS (can_access_job) decides who may
+ * write; the DB trigger backstops the cap + cross-job integrity, so a stale or
+ * hostile client can't overshoot either. Failures are silent no-ops (RLS denial
+ * returns an error / zero rows, same treatment as every other member action).
+ */
+export async function setPhaseAssignee(
   phaseId: string,
   jobId: string,
-  participantId: string | null,
+  participantId: string,
+  assigned: boolean,
 ) {
   const ctx = await getSessionContext();
   if (!ctx) return;
 
   const supabase = await createClient();
-  const { data: before } = await supabase
-    .from("phases")
-    .select("assignee_participant_id")
-    .eq("id", phaseId)
-    .maybeSingle();
-  const fromId = before?.assignee_participant_id ?? null;
+  if (assigned) {
+    // The UI disables adding past the cap; re-check so a stale client is a
+    // clean no-op before the trigger would reject it.
+    const { count } = await supabase
+      .from("phase_assignees")
+      .select("participant_id", { count: "exact", head: true })
+      .eq("phase_id", phaseId);
+    if ((count ?? 0) >= ctx.org.max_assignees_per_phase) return;
 
-  const { data: updated, error } = await supabase
-    .from("phases")
-    .update({ assignee_participant_id: participantId })
-    .eq("id", phaseId)
-    .select("id");
-  if (error || !updated || updated.length === 0) return;
-
-  if (fromId !== participantId) {
-    // Resolve participant ids → names for a human-readable log entry.
-    const ids = [fromId, participantId].filter((x): x is string => !!x);
-    const names = new Map<string, string>();
-    if (ids.length > 0) {
-      const { data } = await supabase
-        .from("participants")
-        .select("id, name")
-        .in("id", ids);
-      for (const r of (data ?? []) as { id: string; name: string }[]) {
-        names.set(r.id, r.name);
-      }
-    }
-    await logActivity({
-      jobId,
-      phaseId,
-      eventType: "assignment_change",
-      actorMemberId: ctx.member.id,
-      detail: {
-        from: fromId ? (names.get(fromId) ?? null) : null,
-        to: participantId ? (names.get(participantId) ?? null) : null,
-      },
+    const { error } = await supabase.from("phase_assignees").insert({
+      phase_id: phaseId,
+      participant_id: participantId,
+      job_id: jobId,
     });
+    if (error) return; // RLS denial, duplicate re-tap, or trigger reject
+  } else {
+    const { data: deleted, error } = await supabase
+      .from("phase_assignees")
+      .delete()
+      .eq("phase_id", phaseId)
+      .eq("participant_id", participantId)
+      .select("participant_id");
+    if (error || !deleted || deleted.length === 0) return; // nothing to remove
   }
+
+  // Human-readable log entry (RLS lets the writer read this job's crew names).
+  const { data: pt } = await supabase
+    .from("participants")
+    .select("name")
+    .eq("id", participantId)
+    .maybeSingle();
+  await logActivity({
+    jobId,
+    phaseId,
+    eventType: "assignment_change",
+    actorMemberId: ctx.member.id,
+    detail: assigned
+      ? { to: pt?.name ?? null }
+      : { from: pt?.name ?? null },
+  });
   await revalidateJob(jobId);
 }
 

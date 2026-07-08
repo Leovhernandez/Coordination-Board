@@ -29,6 +29,9 @@ export type Organization = {
   // phase ends (drives the dated banner; past date = no banner).
   promo_eligible: boolean;
   promo_ends_at: string | null;
+  // M-MULTI: per-org cap on crew per phase (default 10; raiseable per org
+  // without a code change). Enforced in the assign action + a DB trigger.
+  max_assignees_per_phase: number;
 };
 
 export type Job = {
@@ -55,8 +58,21 @@ export type Phase = {
   sequence_index: number;
   status: PhaseStatus;
   blocked_reason: string | null;
+  // LEGACY (M-MULTI): superseded by the phase_assignees junction. Kept only
+  // because the column still exists until the cleanup migration drops it —
+  // do NOT read it; assignments come from PhaseAssignee rows.
   assignee_participant_id: string | null;
   updated_at: string;
+};
+
+// M-MULTI: one crew assignment on a phase (junction row). A phase holds up to
+// the org's max_assignees_per_phase; every assignee has identical permissions
+// (shared last-writer-wins status; the M18 log attributes who changed it).
+export type PhaseAssignee = {
+  phase_id: string;
+  participant_id: string;
+  job_id: string;
+  created_at: string;
 };
 
 export type Participant = {

@@ -16,11 +16,14 @@
 This file has accumulated several rounds of work. **Address the newest dated batch
 first — it is the active queue:**
 
-- **PHASE 0.6 — New bugs & billing (Round 3, 2026-07-01)** ← **newest; start here.**
-  Three items Leo just filed: **N1** (sign-in opens the email app's in-app browser →
-  session doesn't persist + invite-accept doesn't live-refresh), **N2** (configure
-  Base/Pro/Enterprise pricing in Stripe + auto-transition off the 3-month promo to
-  Base $49 with a dated notice), **N3** (Spanish toggle shrinks the mobile screen).
+- **M-MULTI — Multiple crew per phase (Round 4, 2026-07-07)** ← **newest; start here.**
+  Assign up to 10 equal-permission crew (subcontractors) to any phase. Full spec in
+  PHASE 1 → **M-MULTI** (last milestone before "Cross-cutting requirements").
+- **PHASE 0.6 — New bugs & billing (Round 3, 2026-07-01)** — **N1** (sign-in opens the
+  email app's in-app browser → session doesn't persist + invite-accept doesn't
+  live-refresh), **N2** (Base/Pro/Enterprise pricing in Stripe + auto-transition off the
+  3-month promo to Base $49 with a dated notice), **N3** (Spanish toggle shrinks the
+  mobile screen).
 - **PHASE 0.5 — M17 regression fixes (2026-06-29)** — R1–R4, still open unless
   already merged.
 
@@ -657,6 +660,130 @@ a salesman has no access; large orgs export without timing out.
 
 ---
 
+### M-MULTI — Multiple crew (subcontractors) per phase (Base; all tiers) — Round 4, 2026-07-07
+
+> **Current active work order** (see "Where to start"). Customer ask: assign **more
+> than one** crew member (subcontractor) to a single phase, or to any number of
+> phases. Each co-assignee has the **identical** read/write permissions a single
+> assignee has today. Still one status per phase — this stays inside §7 (no per-person
+> task tracking). Schedule as **M24** in the roadmap.
+
+**Confirmed design decisions (Leo, 2026-07-07):**
+- **Status = shared, last-writer-wins.** One status per phase; **any** assignee may set
+  In progress / Blocked / Done; last write wins. **No** per-assignee status, **no**
+  roll-up. The critical-path headline and the 3-second glance are unchanged. The M18
+  activity log attributes who changed it (so a premature "Done" is visible/reversible).
+- **Cap n = 10 per phase, configurable per org** (org-level default 10; raiseable
+  without a code change).
+- **Co-assignee notes = read shared, edit own.** Crew assigned to the same phase READ
+  each other's crew notes (plus member notes) on that phase; EDIT only their own (the
+  M17 "no one edits another's note" rule holds).
+
+**Data model — junction table replacing the single FK.**
+```sql
+create table phase_assignees (
+  phase_id       uuid not null references phases(id)       on delete cascade,
+  participant_id uuid not null references participants(id) on delete cascade,
+  job_id         uuid not null references jobs(id)         on delete cascade, -- denormalized for RLS/realtime scope (as notes does)
+  created_at     timestamptz not null default now(),
+  primary key (phase_id, participant_id)
+);
+-- indexes on (participant_id) and (job_id); (phase_id) covered by the PK.
+```
+Reject an array column (`uuid[]`): no FK integrity, awkward RLS, doesn't extend. The
+old `phases.assignee_participant_id` becomes redundant — **do not read it after the
+switch**; drop it in a cleanup migration once validated.
+
+**Migration — two-phase, reversible (owner applies each manually).**
+1. **Additive migration:** create `phase_assignees` + RLS + realtime + cap trigger;
+   **backfill** one row per phase whose `assignee_participant_id` is non-null. **Keep**
+   the old column for now (rollback safety).
+2. Switch **all** app code (reads + writes) to the junction (file list below).
+3. **Cleanup migration (after validation):** `grep` the repo to confirm **zero**
+   remaining `assignee_participant_id` references, then drop the column.
+
+**RLS (deny-by-default; read vs write split — §5 / M-VIS).**
+- SELECT: any org member reads assignments on org jobs — `using (public.can_read_job(job_id))`.
+- INSERT/UPDATE/DELETE: only a member who can **edit** the job —
+  `using / with check (public.can_access_job(job_id))`. **Crew never self-assign** —
+  assignment is a member action. Grants: select/insert/update/delete to `authenticated`;
+  all to `service_role` (crew read path); `anon` nothing.
+
+**Cap enforcement (n ≤ 10, configurable).**
+- Store the cap as an org config: `organizations.max_assignees_per_phase int not null
+  default 10` (consistent with the §0 capability/config model).
+- Enforce in **two** places: the member assign server action (count existing assignees
+  for the phase; reject over cap with a clear i18n message) **and** a **DB trigger
+  backstop** on `phase_assignees` insert that raises if the phase's assignee count would
+  exceed that org's cap. Belt-and-suspenders — the constraint can't be bypassed.
+
+**Realtime (FIX-1 carry-forward + the R1 lesson — do not skip).**
+- Assign = **INSERT**, unassign = **DELETE** on `phase_assignees`. The DELETE must
+  live-refresh under filter/RLS — the **exact R1 failure mode** — so set the table
+  **`REPLICA IDENTITY FULL`** and add it to the `supabase_realtime` publication.
+- Add `phase_assignees` to the `/jobs/[id]` board's `RealtimeRefresh` `tables` (currently
+  `["phases","notes"]`).
+- The member assign/unassign action must call `broadcastJobChange(jobId)` (as
+  `assignPhase` does today) so crew boards live-update: a newly-assigned crew member's
+  board shows the phase **appear**; an unassigned one sees it **disappear**.
+
+**App-layer changes (switch to the junction). Files (verified references):**
+- `supabase/migrations/*` — the two migrations above.
+- `lib/types.ts` — drop `Phase.assignee_participant_id` (after cleanup); add a
+  `PhaseAssignee` type; the board/notes now carry a **list** of assignees per phase.
+- `app/jobs/[id]/page.tsx` — load `phase_assignees` for the job and pass the assigned
+  participant-id set per phase to `Board`; resolve co-assignee **names** for display
+  (read-only viewers still get names only, no controls — M-DASH).
+- `app/jobs/[id]/Board.tsx` — replace the single `<select>` "Assign to" with a
+  **mobile-friendly multi-select** (checkbox list / chip toggles) over the job's crew;
+  toggling adds/removes a junction row. Show **all** assigned crew names on the phase.
+  Disable adding past the cap with a hint. Read-only mode unchanged (no controls).
+- `app/jobs/[id]/actions.ts` — replace `assignPhase` (single FK set) with
+  `assignParticipant` / `unassignParticipant` (or one idempotent toggle) that add/remove
+  a junction row; enforce the cap; call `revalidateJob` (which broadcasts).
+- `app/j/[jobId]/page.tsx` — "phases assigned to me" changes from
+  `assignee_participant_id = me` to `phase_id IN (select phase_id from phase_assignees
+  where participant_id = me)`. Crew board still shows only their phases.
+- `app/j/[jobId]/actions.ts` — in `updateAssignedPhase`, `addCrewNote`, `editCrewNote`,
+  `deleteCrewNote`, replace the `phase.assignee_participant_id === participant.id` guard
+  with "**EXISTS** a `phase_assignees` row for (phaseId, participant.id)". Shared
+  last-writer-wins means the status write itself is otherwise unchanged.
+- `app/j/[jobId]/ParticipantBoard.tsx` — verify it renders passed-in phases unchanged
+  (likely no logic change; confirm).
+- `lib/notes.ts` — **co-assignee read expansion (agreed):** in `notesForParticipant`,
+  on a phase the participant is assigned to, also return **other co-assignees' crew
+  notes** (read-only; `canEdit` stays true only for the viewer's own). Scope strictly to
+  assigned phases. Crew note **edit/delete** guards remain author-only.
+- `lib/export.ts` — the data export currently emits a single assignee per phase; emit
+  **all** assignees (list/joined names) so exports stay correct.
+- `docs/ROADMAP-AND-PRICING.md` — add **M-MULTI (M24)** to the build order (Base).
+- `AGENTS.md §9` — record the decision (multi-assignee per phase; shared
+  last-writer-wins; cap 10 configurable; co-assignee read-shared/edit-own notes), noting
+  it stays within §7 (one status per phase; no per-person task tracking).
+
+**Smoke + regression (hard requirement — verify no regression of prior features).**
+- New `supabase/tests` RLS smoke for `phase_assignees`: a member reads org assignments;
+  a salesman can't write assignments on another member's job (unless owner); crew can't
+  self-assign; the **cap trigger rejects the 11th** assignee.
+- Regress the whole board on a real second device: single-assignee still behaves as
+  before (one junction row); one crew member across multiple phases; **two crew on one
+  phase** — both can flip status (last-writer-wins) and both add notes and **see each
+  other's** notes; unassigning one **live-drops** the phase from their board (R1 DELETE
+  case); critical-path headline unchanged; M-DASH read-only view shows multiple
+  assignees and no controls; the full M17 member/crew note matrix intact.
+- Live-refresh checks (second device): assign → phase appears on the new crew's board;
+  unassign → disappears; status change by any co-assignee → all boards + owner dashboard
+  update; note add/edit/delete by co-assignees. Run `docs/RELEASE-CHECKLIST.md`.
+
+**Done when:** an owner/salesman can assign up to the cap (default 10) crew to any
+phase; every assignee has identical read/write (status + own notes) to a single assignee
+today; any assignee's status change and any co-assignee's notes appear live on all
+relevant boards + the owner dashboard on a second device; unassigning removes the phase
+from that crew's board live; the cap is enforced in UI **and** DB; single-assignee and
+all prior features regress clean; smoke tests pass.
+
+---
+
 ## Cross-cutting requirements (every milestone)
 
 - **i18n carry-forward:** any **new** user-facing string (notes, logs, export,
@@ -692,9 +819,12 @@ building.**
    IDENTITY FULL) + R2 (owner read-only on salesmen's jobs — confirm with Leo)
    before resuming Phase 1; R4 (header truncation) any time; R3 (job delete) is
    scheduled as **M10**.
-3. **Phase 0.6 (Round 3 — current):** N1 (system-browser sign-in persistence + Team
+3. **Phase 0.6 (Round 3):** N1 (system-browser sign-in persistence + Team
    invite-accept live refresh), N2 (Stripe Base/Pro/Enterprise + promo→Base $49
    auto-transition with dated notice), N3 (Spanish mobile layout overflow).
-4. **Phase 1:** M-VIS → M-DASH → M13 (i18n) → M17 (notes) → M18 (logging) → M22
+4. **M-MULTI (Round 4 — current):** multiple crew per phase (junction table, shared
+   last-writer-wins status, cap 10 configurable, co-assignee read-shared/edit-own
+   notes, REPLICA IDENTITY FULL for un-assign live-refresh).
+5. **Phase 1:** M-VIS → M-DASH → M13 (i18n) → M17 (notes) → M18 (logging) → M22
    (photos, Pro) → M-EXPORT. Each: migration (if any → manual apply) → code →
    regression → owner validates → update docs → pause.
