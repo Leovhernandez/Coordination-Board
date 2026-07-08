@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
-  getParticipantByToken,
+  getVerifiedParticipant,
   participantCookieName,
 } from "@/lib/participant";
 import { BroadcastRefresh } from "@/components/BroadcastRefresh";
@@ -19,28 +19,41 @@ export default async function ParticipantPage({
   searchParams,
 }: {
   params: Promise<{ jobId: string }>;
-  searchParams: Promise<{ t?: string }>;
+  searchParams: Promise<{ t?: string; inuse?: string }>;
 }) {
   const { jobId } = await params;
   const sp = await searchParams;
 
   // First visit carries the token in the URL: hand off to the entry route,
-  // which sets the cookie and bounces back here clean.
+  // which validates + claims for this device, sets the cookies, and bounces
+  // back here clean (M-CLAIM).
   if (sp.t) {
     redirect(`/j/${jobId}/enter?t=${encodeURIComponent(sp.t)}`);
   }
 
-  const token = (await cookies()).get(participantCookieName(jobId))?.value;
-  const participant = await getParticipantByToken(jobId, token);
+  // M-CLAIM: reads require the device's claim to match (or the admin bypass).
+  const participant = await getVerifiedParticipant(jobId);
   const t = await getDictionary();
 
+  // Pre-M-CLAIM cookie without a claim yet: route through /enter so THIS
+  // device claims the link (seamless migration for existing crew).
+  if (participant?.unclaimed && !participant.adminTest) {
+    const token = (await cookies()).get(participantCookieName(jobId))?.value;
+    if (token) redirect(`/j/${jobId}/enter?t=${encodeURIComponent(token)}`);
+  }
+
   if (!participant) {
+    // Distinguish "claimed by another device" (the enter route bounced us here
+    // with ?inuse=1) from a revoked/invalid link.
+    const inUse = sp.inuse === "1";
     return (
       <main className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-3 p-6 text-center">
         <h1 className="text-xl font-semibold text-slate-900">
-          {t.participant.linkInactive}
+          {inUse ? t.participant.linkInUse : t.participant.linkInactive}
         </h1>
-        <p className="text-sm text-slate-500">{t.participant.linkInactiveHint}</p>
+        <p className="text-sm text-slate-500">
+          {inUse ? t.participant.linkInUseHint : t.participant.linkInactiveHint}
+        </p>
       </main>
     );
   }

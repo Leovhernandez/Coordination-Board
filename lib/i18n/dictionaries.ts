@@ -113,7 +113,7 @@ export const en = {
   crew: {
     title: "Crew",
     description:
-      "Text a link to a sub — it opens this board with no sign-in. They update only the phases you assign them.",
+      "Text a link to a sub — it opens this board with no sign-in. They update only the phases you assign them. Each link locks to the first device that opens it.",
     revoke: "Revoke",
     revokeConfirm: "Revoke {name}'s link? It will stop working.",
     copyLink: "Copy link",
@@ -123,6 +123,11 @@ export const en = {
     subName: "Sub name",
     phonePlaceholder: "Phone (optional)",
     add: "Add",
+    notOpened: "Not opened yet",
+    inUseSince: "In use since {date}",
+    resetLink: "Reset link",
+    resetConfirm:
+      "Reset {name}'s link? The old link stops working immediately — text them the new one.",
   },
 
   participant: {
@@ -134,6 +139,9 @@ export const en = {
     linkInactive: "This link isn’t active",
     linkInactiveHint:
       "It may have been revoked or it’s incorrect. Ask the contractor to text you a fresh link.",
+    linkInUse: "This link is already in use on another device",
+    linkInUseHint:
+      "For security, a crew link works on one device only. Ask your contractor to send you a fresh link.",
   },
 
   auth: {
@@ -354,6 +362,7 @@ export const en = {
     assigned: "{actor} assigned {name}",
     unassigned: "{actor} cleared the assignment",
     unassignedName: "{actor} removed {name}",
+    adminTest: "admin test",
     phaseAdded: "{actor} added this phase",
     phaseDeleted: "{actor} deleted {label}",
     noteAdded: "{actor} added a note",
@@ -486,7 +495,7 @@ export const es: Dict = {
   crew: {
     title: "Cuadrilla",
     description:
-      "Envía un enlace por mensaje a un sub — abre este tablero sin iniciar sesión. Solo actualizan las fases que les asignes.",
+      "Envía un enlace por mensaje a un sub — abre este tablero sin iniciar sesión. Solo actualizan las fases que les asignes. Cada enlace queda vinculado al primer dispositivo que lo abre.",
     revoke: "Revocar",
     revokeConfirm: "¿Revocar el enlace de {name}? Dejará de funcionar.",
     copyLink: "Copiar enlace",
@@ -496,6 +505,11 @@ export const es: Dict = {
     subName: "Nombre del sub",
     phonePlaceholder: "Teléfono (opcional)",
     add: "Agregar",
+    notOpened: "Sin abrir aún",
+    inUseSince: "En uso desde {date}",
+    resetLink: "Restablecer enlace",
+    resetConfirm:
+      "¿Restablecer el enlace de {name}? El enlace anterior dejará de funcionar de inmediato — envíale el nuevo por mensaje.",
   },
 
   participant: {
@@ -507,6 +521,9 @@ export const es: Dict = {
     linkInactive: "Este enlace no está activo",
     linkInactiveHint:
       "Puede haber sido revocado o es incorrecto. Pídele al contratista que te envíe un enlace nuevo.",
+    linkInUse: "Este enlace ya está en uso en otro dispositivo",
+    linkInUseHint:
+      "Por seguridad, un enlace de cuadrilla funciona en un solo dispositivo. Pídele a tu contratista que te envíe un enlace nuevo.",
   },
 
   auth: {
@@ -731,6 +748,7 @@ export const es: Dict = {
     assigned: "{actor} asignó a {name}",
     unassigned: "{actor} quitó la asignación",
     unassignedName: "{actor} quitó a {name}",
+    adminTest: "prueba admin",
     phaseAdded: "{actor} agregó esta fase",
     phaseDeleted: "{actor} eliminó {label}",
     noteAdded: "{actor} agregó una nota",

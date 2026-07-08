@@ -288,6 +288,39 @@ export async function revokeParticipant(participantId: string, jobId: string) {
   await revalidateJob(jobId);
 }
 
+/**
+ * M-CLAIM: resets a crew link — mints a fresh token and clears the device
+ * claim, keeping the participant row (name, phone, assignments, payment
+ * method). For when the crew member changed phones / cleared cookies, or a
+ * claim looks wrong. The old URL stops working immediately; the reset is
+ * logged so the claim trail stays honest.
+ */
+export async function resetParticipantLink(participantId: string, jobId: string) {
+  const ctx = await getSessionContext();
+  if (!ctx) return;
+
+  const supabase = await createClient();
+  const token = randomBytes(32).toString("base64url");
+  const { data: updated, error } = await supabase
+    .from("participants")
+    .update({
+      invite_token: token,
+      claim_secret_hash: null,
+      claimed_at: null,
+    })
+    .eq("id", participantId)
+    .select("id, name");
+  if (error || !updated || updated.length === 0) return; // RLS-denied → no-op
+
+  await logActivity({
+    jobId,
+    eventType: "link_reset",
+    actorMemberId: ctx.member.id,
+    detail: { name: updated[0].name },
+  });
+  await revalidateJob(jobId);
+}
+
 /** Assigns (or clears) the participant who may update a phase. */
 /**
  * M-MULTI: toggles ONE crew assignment on a phase. `assigned=true` adds the

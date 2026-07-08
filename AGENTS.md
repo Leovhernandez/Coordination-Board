@@ -189,13 +189,29 @@ gated behind a pricing tier (see `docs/ROADMAP-AND-PRICING.md`).
   shared, last-writer-wins** — any assignee may set it; the M18 log attributes
   who did (so a premature "Done" is visible/reversible). NO per-person task
   tracking — stays inside §7; the headline and 3-second glance are unchanged.
-  Co-assignees on a shared phase READ each other's crew notes; edit stays
-  own-only (M17 rule). RLS: members read assignments org-wide (`can_read_job`),
+  Co-assignees on a shared phase READ each other's crew notes AND status photos
+  (photos added 2026-07-08, owner-confirmed); edit stays own-only (M17 rule).
+  RLS: members read assignments org-wide (`can_read_job`),
   write via `can_access_job` (mirrors phases); crew NEVER self-assign (anon has
   no grants; crew writes stay on the token-scoped service path). Live-refreshes
   (`phase_assignees` published + REPLICA IDENTITY FULL so an UNASSIGN delete
   propagates — the R1 lesson; assign/unassign also broadcast for anon crew
   boards, so an assigned phase appears / an unassigned one disappears live).
+- **Crew-link device binding (M-CLAIM, all tiers — owner-mandated 2026-07-08).**
+  The crew link is a bearer credential its issuer also holds, so a member could
+  impersonate crew from a private window — an attribution/transparency hole.
+  **Shipped:** the FIRST device to open a link CLAIMS it (random device secret
+  in an httpOnly cookie; only its sha-256 hash stored on `participants`); any
+  other device presenting the raw URL is FULLY blocked (reads too — notes carry
+  gate codes). Claims and member "Reset link" re-issues (new token, claim
+  cleared, same participant row) are logged to the append-only M18 log, which
+  members cannot edit — impersonation attempts are therefore LOUD, not silent.
+  Crew panel shows "Not opened yet / In use since {date}" + Reset link.
+  **Test bypass:** an `ADMIN_EMAIL` (platform operator) session may open any
+  crew link WITHOUT claiming it; its actions carry an `adminTest` marker in
+  History. Scoped to the operator env var — NEVER org owners, or the hole
+  reopens. Residual (accepted): whoever physically holds the crew member's
+  claimed device can act as them — no web mechanism fixes physical access.
 
 Anything not listed here remains under §7. New asks still get the glance test and
 an explicit tier before they ship.

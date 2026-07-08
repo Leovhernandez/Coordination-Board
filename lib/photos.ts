@@ -79,10 +79,12 @@ export async function photosForJob(
 }
 
 /**
- * Photos a crew PARTICIPANT may see: on phases assigned to them only, and only
- * member-uploaded photos plus THEIR OWN (mirrors notesForParticipant). Because a
- * phase has a single assignee, "another crew's photo on my phase" can't occur, but
- * the filter is kept explicit for parity with notes.
+ * Photos a crew PARTICIPANT may see: on phases assigned to them only — member
+ * photos plus ALL crew photos on those phases (M-MULTI follow-up, owner-confirmed:
+ * co-assignees on a shared phase see each other's status evidence, exactly like
+ * notes; a since-unassigned uploader's photo stays visible for context). Scope
+ * stays strictly the assigned phase ids — photos on other phases never leave the
+ * server. Mirrors notesForParticipant.
  */
 export async function photosForParticipant(
   jobId: string,
@@ -98,11 +100,7 @@ export async function photosForParticipant(
     .eq("job_id", jobId)
     .in("phase_id", phaseIds)
     .order("created_at", { ascending: true });
-  const photos = ((data ?? []) as Photo[]).filter(
-    (p) =>
-      p.uploaded_by_member_id != null ||
-      p.uploaded_by_participant_id === participantId,
-  );
+  const photos = (data ?? []) as Photo[];
   if (photos.length === 0) return {};
   const { memberName, partName } = await nameMaps(svc, orgId, jobId);
   return groupByPhase(photos.map((p) => viewOf(p, memberName, partName)));
