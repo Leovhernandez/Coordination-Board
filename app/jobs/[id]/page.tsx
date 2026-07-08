@@ -55,6 +55,18 @@ export default async function JobBoardPage({
     .order("sequence_index", { ascending: true });
   const phases = (phasesData ?? []) as Phase[];
 
+  // M-MULTI: crew assignments come from the phase_assignees junction (the legacy
+  // phases.assignee_participant_id is never read). Members read org-wide via RLS.
+  const { data: paData } = await supabase
+    .from("phase_assignees")
+    .select("phase_id, participant_id")
+    .eq("job_id", id)
+    .order("created_at", { ascending: true });
+  const assigneesByPhase: Record<string, string[]> = {};
+  for (const r of (paData ?? []) as { phase_id: string; participant_id: string }[]) {
+    (assigneesByPhase[r.phase_id] ??= []).push(r.participant_id);
+  }
+
   // M17: notes for every phase, author resolved + per-note canEdit precomputed for
   // this viewer (only their own member notes are editable — mirrors RLS).
   const notesByPhase = await notesForJob(job.id, job.org_id, ctx.member.id);
@@ -113,7 +125,14 @@ export default async function JobBoardPage({
       <RealtimeRefresh
         channelName={`phases-job-${job.id}`}
         filter={`job_id=eq.${job.id}`}
-        tables={["phases", "notes", "activity_log", "photos", "participants"]}
+        tables={[
+          "phases",
+          "phase_assignees",
+          "notes",
+          "activity_log",
+          "photos",
+          "participants",
+        ]}
       />
       <header>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -174,6 +193,8 @@ export default async function JobBoardPage({
         jobId={job.id}
         phases={phases}
         participants={assignees}
+        assigneesByPhase={assigneesByPhase}
+        maxAssignees={ctx.org.max_assignees_per_phase}
         notesByPhase={notesByPhase}
         activityByPhase={activityByPhase}
         photosByPhase={photosByPhase}

@@ -19,6 +19,7 @@ import { interpolate } from "@/lib/i18n/interpolate";
 function describe(e: ActivityView, t: Dict): string {
   const d = (e.detail ?? {}) as {
     to?: unknown;
+    from?: unknown;
     label?: unknown;
   };
   switch (e.eventType) {
@@ -34,12 +35,19 @@ function describe(e: ActivityView, t: Dict): string {
         label: String(d.to ?? ""),
       });
     case "assignment_change":
+      // M-MULTI logs one name per toggle: {to} = assigned, {from} = removed.
+      // Legacy single-assign swap events ({from,to}) render as "assigned {to}".
       return d.to
         ? interpolate(t.history.assigned, {
             actor: e.actorName,
             name: String(d.to),
           })
-        : interpolate(t.history.unassigned, { actor: e.actorName });
+        : d.from
+          ? interpolate(t.history.unassignedName, {
+              actor: e.actorName,
+              name: String(d.from),
+            })
+          : interpolate(t.history.unassigned, { actor: e.actorName });
     case "phase_added":
       return interpolate(t.history.phaseAdded, { actor: e.actorName });
     case "phase_deleted":

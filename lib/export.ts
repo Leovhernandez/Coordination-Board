@@ -80,14 +80,22 @@ export async function buildOrgCsvs(orgId: string): Promise<ExportFile[]> {
   let notes: Note[] = [];
   let activity: ActivityEvent[] = [];
   const partName = new Map<string, string>();
+  // M-MULTI: all assignees per phase (from the phase_assignees junction).
+  const assigneeIdsByPhase = new Map<string, string[]>();
 
   if (jobIds.length > 0) {
-    const [ph, nt, ac, pt] = await Promise.all([
+    const [ph, nt, ac, pt, pa] = await Promise.all([
       allByJobIds(svc, "phases", jobIds),
       allByJobIds(svc, "notes", jobIds),
       allByJobIds(svc, "activity_log", jobIds),
       allByJobIds(svc, "participants", jobIds),
+      allByJobIds(svc, "phase_assignees", jobIds),
     ]);
+    for (const r of pa as { phase_id: string; participant_id: string }[]) {
+      const list = assigneeIdsByPhase.get(r.phase_id) ?? [];
+      list.push(r.participant_id);
+      assigneeIdsByPhase.set(r.phase_id, list);
+    }
     phases = (ph as unknown as Phase[]).sort(
       (a, b) =>
         a.job_id.localeCompare(b.job_id) || a.sequence_index - b.sequence_index,
@@ -125,7 +133,7 @@ export async function buildOrgCsvs(orgId: string): Promise<ExportFile[]> {
   );
 
   const phasesCsv = toCsv(
-    ["id", "job_id", "job_name", "sequence_index", "label", "status", "blocked_reason", "assignee", "updated_at"],
+    ["id", "job_id", "job_name", "sequence_index", "label", "status", "blocked_reason", "assignees", "updated_at"],
     phases.map((p) => [
       p.id,
       p.job_id,
@@ -134,7 +142,10 @@ export async function buildOrgCsvs(orgId: string): Promise<ExportFile[]> {
       p.label,
       p.status,
       p.blocked_reason,
-      p.assignee_participant_id ? (partName.get(p.assignee_participant_id) ?? "—") : "",
+      // M-MULTI: every assignee, joined — a phase may carry several crew.
+      (assigneeIdsByPhase.get(p.id) ?? [])
+        .map((id) => partName.get(id) ?? "—")
+        .join("; "),
       p.updated_at,
     ]),
   );

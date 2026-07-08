@@ -179,6 +179,23 @@ gated behind a pricing tier (see `docs/ROADMAP-AND-PRICING.md`).
   earlier "Pro-only" framing** — Trinity is on Base and gets photos at the Base cap.
 - **Incentive scoreboard (Pro).** Points for crew actions. Validate with Trinity
   before heavy build.
+- **Multiple crew per phase (Base; all tiers).** Customer ask, Round 4. **Shipped
+  (M-MULTI / M24, 2026-07-08):** a `phase_assignees` junction replaces the single
+  `phases.assignee_participant_id` FK (column kept until the cleanup migration;
+  a DB bridge trigger mirrors legacy writes meanwhile). Up to
+  `organizations.max_assignees_per_phase` crew per phase (default 10, per-org
+  raiseable — config, not code), enforced in the assign action AND a DB trigger
+  that also rejects cross-job junction rows. **Status stays ONE per phase,
+  shared, last-writer-wins** — any assignee may set it; the M18 log attributes
+  who did (so a premature "Done" is visible/reversible). NO per-person task
+  tracking — stays inside §7; the headline and 3-second glance are unchanged.
+  Co-assignees on a shared phase READ each other's crew notes; edit stays
+  own-only (M17 rule). RLS: members read assignments org-wide (`can_read_job`),
+  write via `can_access_job` (mirrors phases); crew NEVER self-assign (anon has
+  no grants; crew writes stay on the token-scoped service path). Live-refreshes
+  (`phase_assignees` published + REPLICA IDENTITY FULL so an UNASSIGN delete
+  propagates — the R1 lesson; assign/unassign also broadcast for anon crew
+  boards, so an assigned phase appears / an unassigned one disappears live).
 
 Anything not listed here remains under §7. New asks still get the glance test and
 an explicit tier before they ship.
