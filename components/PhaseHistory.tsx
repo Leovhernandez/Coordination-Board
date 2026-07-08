@@ -95,6 +95,10 @@ export function PhaseHistory({ events }: { events: ActivityView[] }) {
               <li key={e.id} className="text-xs text-slate-500">
                 <span className="text-slate-700">{describe(e, t)}</span>
                 {e.actorType === "crew" && ` · ${t.notes.crewTag}`}
+                {/* M-CLAIM: actions via the ADMIN_EMAIL test bypass are marked
+                    so a test never masquerades as real crew activity. */}
+                {(e.detail as { adminTest?: unknown }).adminTest === true &&
+                  ` · ${t.history.adminTest}`}
                 {` · ${relativeTime(e.createdAt, lang)}`}
               </li>
             ))}

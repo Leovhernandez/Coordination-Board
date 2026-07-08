@@ -87,6 +87,11 @@ export type Participant = {
   // null; payment_detail is free text (phone/@handle/note). Per job/link row.
   payment_type: string | null;
   payment_detail: string | null;
+  // M-CLAIM: device binding. The sha-256 hash of the claiming device's secret
+  // (never the secret itself) + when the link was first opened. Null = not yet
+  // claimed. NEVER send claim_secret_hash to the client.
+  claim_secret_hash: string | null;
+  claimed_at: string | null;
 };
 
 // M21: the allowed preferred-payment methods. Single source of truth shared by the
@@ -140,7 +145,12 @@ export type ActivityEventType =
   | "phase_deleted"
   | "note_added"
   | "note_edited"
-  | "note_deleted";
+  | "note_deleted"
+  // M-CLAIM: crew-link device binding — first-open claim + member link reset.
+  // Job-level events (phase_id null): they surface in the Crew panel + export,
+  // not the per-phase History.
+  | "link_claimed"
+  | "link_reset";
 
 export type ActivityEvent = {
   id: string;

@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { addParticipant, revokeParticipant } from "./actions";
-import { useT } from "@/components/I18nProvider";
+import {
+  addParticipant,
+  resetParticipantLink,
+  revokeParticipant,
+} from "./actions";
+import { useT, useLang } from "@/components/I18nProvider";
 import { interpolate } from "@/lib/i18n/interpolate";
 
 export type CrewMember = {
@@ -13,6 +17,8 @@ export type CrewMember = {
   // M21: preferred payment method (only shown when the org opted in).
   paymentType?: string | null;
   paymentDetail?: string | null;
+  // M-CLAIM: when the link was first opened (device-bound). Null = not yet.
+  claimedAt?: string | null;
 };
 
 export function Crew({
@@ -26,6 +32,7 @@ export function Crew({
   collectPaymentMethod?: boolean;
 }) {
   const t = useT();
+  const lang = useLang();
   const [, startTransition] = useTransition();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -59,6 +66,11 @@ export function Crew({
     startTransition(() => revokeParticipant(member.id, jobId));
   }
 
+  function onResetLink(member: CrewMember) {
+    if (!confirm(interpolate(t.crew.resetConfirm, { name: member.name }))) return;
+    startTransition(() => resetParticipantLink(member.id, jobId));
+  }
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="mb-1 text-sm font-semibold text-slate-900">{t.crew.title}</h2>
@@ -71,14 +83,37 @@ export function Crew({
             className="rounded-lg border border-slate-200 p-3"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="font-medium text-slate-900">{m.name}</span>
-              <button
-                type="button"
-                onClick={() => onRevoke(m)}
-                className="text-xs font-medium text-red-600"
-              >
-                {t.crew.revoke}
-              </button>
+              <span className="min-w-0 truncate font-medium text-slate-900">
+                {m.name}
+              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                {/* M-CLAIM: which device state the link is in. "In use" = bound
+                    to the first device that opened it; Reset issues a fresh
+                    link (new phone / cleared cookies). */}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    m.claimedAt
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {m.claimedAt
+                    ? interpolate(t.crew.inUseSince, {
+                        date: new Date(m.claimedAt).toLocaleDateString(
+                          lang === "es" ? "es-US" : "en-US",
+                          { month: "short", day: "numeric" },
+                        ),
+                      })
+                    : t.crew.notOpened}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRevoke(m)}
+                  className="text-xs font-medium text-red-600"
+                >
+                  {t.crew.revoke}
+                </button>
+              </div>
             </div>
             {m.phone && (
               <p className="text-xs text-slate-500">{m.phone}</p>
@@ -113,6 +148,13 @@ export function Crew({
                   {t.crew.textIt}
                 </a>
               )}
+              <button
+                type="button"
+                onClick={() => onResetLink(m)}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 active:bg-slate-100"
+              >
+                {t.crew.resetLink}
+              </button>
             </div>
             <p className="mt-2 break-all text-[11px] text-slate-400">{m.link}</p>
           </div>

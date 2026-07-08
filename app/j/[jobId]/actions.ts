@@ -1,13 +1,9 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  getParticipantByToken,
-  participantCookieName,
-} from "@/lib/participant";
+import { getVerifiedParticipant } from "@/lib/participant";
 import { broadcastJobChange } from "@/lib/realtime";
 import { logActivity } from "@/lib/activity";
 import {
@@ -62,7 +58,8 @@ async function isAssignedToPhase(
 /**
  * Participant phase update. Enforces the CLAUDE.md §5 invariant end-to-end:
  *   1. read the httpOnly token cookie for THIS job,
- *   2. validate it against a non-revoked participants row,
+ *   2. validate it against a non-revoked participants row AND the M-CLAIM
+ *      device claim (or the logged ADMIN_EMAIL test bypass),
  *   3. confirm the phase belongs to this job AND is assigned to this participant,
  *   4. write via the service-role client (server-side only).
  * Any failure is a silent no-op — a participant can touch no other phase/job.
@@ -73,8 +70,7 @@ export async function updateAssignedPhase(
   status: PhaseStatus,
   blockedReason: string | null,
 ) {
-  const token = (await cookies()).get(participantCookieName(jobId))?.value;
-  const participant = await getParticipantByToken(jobId, token);
+  const participant = await getVerifiedParticipant(jobId);
   if (!participant) return;
 
   const supabase = createServiceClient();
@@ -117,7 +113,12 @@ export async function updateAssignedPhase(
       phaseId,
       eventType: "status_change",
       actorParticipantId: participant.id,
-      detail: { from: phase.status, to: status, ...(reason ? { reason } : {}) },
+      detail: {
+        from: phase.status,
+        to: status,
+        ...(reason ? { reason } : {}),
+        ...(participant.adminTest ? { adminTest: true } : {}),
+      },
     });
   }
 
@@ -135,8 +136,7 @@ export async function updateAssignedPhase(
 export async function addCrewNote(jobId: string, phaseId: string, body: string) {
   const text = body.trim();
   if (!text) return;
-  const token = (await cookies()).get(participantCookieName(jobId))?.value;
-  const participant = await getParticipantByToken(jobId, token);
+  const participant = await getVerifiedParticipant(jobId);
   if (!participant) return;
 
   const supabase = createServiceClient();
@@ -170,6 +170,7 @@ export async function addCrewNote(jobId: string, phaseId: string, body: string) 
       noteId: created.id,
       eventType: "note_added",
       actorParticipantId: participant.id,
+      detail: participant.adminTest ? { adminTest: true } : {},
     });
   }
   await revalidateCrew(jobId);
@@ -179,8 +180,7 @@ export async function addCrewNote(jobId: string, phaseId: string, body: string) 
 export async function editCrewNote(jobId: string, noteId: string, body: string) {
   const text = body.trim();
   if (!text) return;
-  const token = (await cookies()).get(participantCookieName(jobId))?.value;
-  const participant = await getParticipantByToken(jobId, token);
+  const participant = await getVerifiedParticipant(jobId);
   if (!participant) return;
 
   const supabase = createServiceClient();
@@ -203,14 +203,14 @@ export async function editCrewNote(jobId: string, noteId: string, body: string) 
     noteId,
     eventType: "note_edited",
     actorParticipantId: participant.id,
+    detail: participant.adminTest ? { adminTest: true } : {},
   });
   await revalidateCrew(jobId);
 }
 
 /** Deletes a crew note this participant authored. */
 export async function deleteCrewNote(jobId: string, noteId: string) {
-  const token = (await cookies()).get(participantCookieName(jobId))?.value;
-  const participant = await getParticipantByToken(jobId, token);
+  const participant = await getVerifiedParticipant(jobId);
   if (!participant) return;
 
   const supabase = createServiceClient();
@@ -232,6 +232,7 @@ export async function deleteCrewNote(jobId: string, noteId: string) {
     noteId: null,
     eventType: "note_deleted",
     actorParticipantId: participant.id,
+    detail: participant.adminTest ? { adminTest: true } : {},
   });
   await revalidateCrew(jobId);
 }
@@ -244,8 +245,7 @@ export async function deleteCrewNote(jobId: string, noteId: string) {
 // org cap are re-checked server-side. Bytes go browser->R2; this never touches them.
 
 async function crewPhaseForWrite(jobId: string, phaseId: string) {
-  const token = (await cookies()).get(participantCookieName(jobId))?.value;
-  const participant = await getParticipantByToken(jobId, token);
+  const participant = await getVerifiedParticipant(jobId);
   if (!participant) return null;
   const supabase = createServiceClient();
   const { data: phase } = await supabase
@@ -379,8 +379,7 @@ export async function setCrewPaymentMethod(
   paymentType: string | null,
   paymentDetail: string | null,
 ) {
-  const token = (await cookies()).get(participantCookieName(jobId))?.value;
-  const participant = await getParticipantByToken(jobId, token);
+  const participant = await getVerifiedParticipant(jobId);
   if (!participant) return;
 
   const supabase = createServiceClient();

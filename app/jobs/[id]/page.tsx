@@ -90,6 +90,7 @@ export default async function JobBoardPage({
     link: string;
     paymentType: string | null;
     paymentDetail: string | null;
+    claimedAt: string | null;
   }[] = [];
   let assignees: { id: string; name: string }[] = [];
   if (canEdit) {
@@ -100,6 +101,7 @@ export default async function JobBoardPage({
       .eq("revoked", false)
       .order("created_at", { ascending: true });
     const participants = (data ?? []) as Participant[];
+    // Explicit field mapping — claim_secret_hash must never reach the client.
     crew = participants.map((p) => ({
       id: p.id,
       name: p.name,
@@ -107,6 +109,7 @@ export default async function JobBoardPage({
       link: participantLink(id, p.invite_token),
       paymentType: p.payment_type,
       paymentDetail: p.payment_detail,
+      claimedAt: p.claimed_at,
     }));
     assignees = participants.map((p) => ({ id: p.id, name: p.name }));
   } else {
