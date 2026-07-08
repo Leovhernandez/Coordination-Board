@@ -93,6 +93,22 @@ once):
      earlier commit — the activity_log live-refresh race).
   5. Confirm the owner dashboard, the salesman dashboard/roll-up, **and** the
      participant board each refresh for the relevant change.
+  6. **The socket must carry the AUTHED token before any channel joins**
+     (M25-era outage): Supabase Realtime REJECTS a *filtered* `postgres_changes`
+     subscription whose claims-role can't SELECT the filter column
+     (`invalid column for filter …` in the postgres logs) — a channel that
+     races the session join registers as `anon` and the board goes silently
+     deaf while still reporting SUBSCRIBED. `RealtimeRefresh` awaits
+     `getSession()` + `realtime.setAuth()` before subscribing, re-arms the
+     token on auth refresh, retries errored channels with backoff (+ one
+     catch-up refresh on recovery), and refreshes on tab-visibility. Do NOT
+     add a subscribe path that bypasses this ordering.
+  7. **Member boards run TWO independent refresh paths** (owner-mandated):
+     RLS-scoped `postgres_changes` AND the job's broadcast channel
+     (`BroadcastRefresh` — every member/crew server action broadcasts via
+     `revalidateJob`/`revalidateCrew`; the enter-route claim broadcasts too).
+     Either path alone must keep the board live; a new mutation path that
+     doesn't broadcast is incomplete.
 
 Schema/RLS and auth changes additionally require the **RLS pre-flight**
 (RELEASE-CHECKLIST Step 2) to pass before they reach `main`.

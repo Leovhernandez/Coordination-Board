@@ -8,6 +8,7 @@ import { notesForJob } from "@/lib/notes";
 import { activityForJob } from "@/lib/activity";
 import { photosForJob } from "@/lib/photos";
 import { RealtimeRefresh } from "@/components/RealtimeRefresh";
+import { BroadcastRefresh } from "@/components/BroadcastRefresh";
 import { getDictionary } from "@/lib/i18n/server";
 import { Board } from "./Board";
 import { Crew } from "./Crew";
@@ -137,6 +138,11 @@ export default async function JobBoardPage({
           "participants",
         ]}
       />
+      {/* Second, independent live-refresh path (§6 hardening): every member and
+          crew mutation broadcasts on the job channel (anon-friendly, no RLS/JWT
+          dependency), so this board refreshes even if the RLS-scoped
+          postgres_changes path above degrades — and vice versa. */}
+      <BroadcastRefresh jobId={job.id} />
       <header>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Link
