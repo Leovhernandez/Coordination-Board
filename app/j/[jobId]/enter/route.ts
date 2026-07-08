@@ -9,6 +9,7 @@ import {
   participantCookieName,
 } from "@/lib/participant";
 import { logActivity } from "@/lib/activity";
+import { broadcastJobChange } from "@/lib/realtime";
 
 /**
  * Entry point for an invite link. The board page redirects here when it sees
@@ -78,6 +79,10 @@ export async function GET(request: NextRequest) {
         actorParticipantId: participant.id,
         detail: { name: participant.name },
       });
+      // Broadcast so the owner's open Crew panel flips "Not opened yet" →
+      // "In use since {date}" live via the broadcast path too (§6: the claim
+      // is a data-bearing change another session may be watching).
+      await broadcastJobChange(jobId);
       const res = NextResponse.redirect(boardUrl);
       res.cookies.set(participantCookieName(jobId), token!, COOKIE_OPTS(jobId));
       res.cookies.set(claimCookieName(jobId), secret, COOKIE_OPTS(jobId));
