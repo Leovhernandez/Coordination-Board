@@ -14,7 +14,6 @@ const ph = (
   sequence_index: seq++,
   status,
   blocked_reason,
-  assignee_participant_id: null,
   updated_at: "",
 });
 
