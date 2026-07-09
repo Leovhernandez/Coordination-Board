@@ -57,7 +57,7 @@ export default async function JobBoardPage({
   const phases = (phasesData ?? []) as Phase[];
 
   // M-MULTI: crew assignments come from the phase_assignees junction (the legacy
-  // phases.assignee_participant_id is never read). Members read org-wide via RLS.
+  // single-FK column has been dropped). Members read org-wide via RLS.
   const { data: paData } = await supabase
     .from("phase_assignees")
     .select("phase_id, participant_id")

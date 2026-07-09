@@ -58,10 +58,9 @@ export type Phase = {
   sequence_index: number;
   status: PhaseStatus;
   blocked_reason: string | null;
-  // LEGACY (M-MULTI): superseded by the phase_assignees junction. Kept only
-  // because the column still exists until the cleanup migration drops it —
-  // do NOT read it; assignments come from PhaseAssignee rows.
-  assignee_participant_id: string | null;
+  // Assignment lives in the phase_assignees junction (M-MULTI). The legacy
+  // phases.assignee_participant_id column was dropped in the cleanup migration
+  // 20260709120000 — a phase now carries a LIST of assignees, never a single FK.
   updated_at: string;
 };
 

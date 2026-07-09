@@ -197,8 +197,8 @@ gated behind a pricing tier (see `docs/ROADMAP-AND-PRICING.md`).
   before heavy build.
 - **Multiple crew per phase (Base; all tiers).** Customer ask, Round 4. **Shipped
   (M-MULTI / M24, 2026-07-08):** a `phase_assignees` junction replaces the single
-  `phases.assignee_participant_id` FK (column kept until the cleanup migration;
-  a DB bridge trigger mirrors legacy writes meanwhile). Up to
+  `phases.assignee_participant_id` FK (legacy column + bridge trigger dropped
+  2026-07-09 after owner validation — the junction is now the sole source). Up to
   `organizations.max_assignees_per_phase` crew per phase (default 10, per-org
   raiseable — config, not code), enforced in the assign action AND a DB trigger
   that also rejects cross-job junction rows. **Status stays ONE per phase,

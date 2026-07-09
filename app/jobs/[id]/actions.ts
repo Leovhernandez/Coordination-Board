@@ -321,15 +321,15 @@ export async function resetParticipantLink(participantId: string, jobId: string)
   await revalidateJob(jobId);
 }
 
-/** Assigns (or clears) the participant who may update a phase. */
 /**
  * M-MULTI: toggles ONE crew assignment on a phase. `assigned=true` adds the
  * participant (up to the org's max_assignees_per_phase), false removes them.
- * Writes go to the phase_assignees junction — never the legacy
- * phases.assignee_participant_id column. RLS (can_access_job) decides who may
- * write; the DB trigger backstops the cap + cross-job integrity, so a stale or
- * hostile client can't overshoot either. Failures are silent no-ops (RLS denial
- * returns an error / zero rows, same treatment as every other member action).
+ * Assignment lives solely in the phase_assignees junction (the legacy
+ * single-FK column was dropped in the cleanup migration). RLS (can_access_job)
+ * decides who may write; the DB trigger backstops the cap + cross-job
+ * integrity, so a stale or hostile client can't overshoot either. Failures are
+ * silent no-ops (RLS denial returns an error / zero rows, same treatment as
+ * every other member action).
  */
 export async function setPhaseAssignee(
   phaseId: string,
